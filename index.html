@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        /* تمام استایل‌ها بدون تغییر باقی مانده‌اند */
         * {
             margin: 0;
             padding: 0;
@@ -706,6 +705,8 @@
                         <option value="قم">قم</option>
                         <option value="البرز">البرز</option>
                         <option value="گلستان">گلستان</option>
+                        <option value="کرمان">کرمان</option>
+                        <option value="یزد">یزد</option>
                     </select>
                     <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
                 </div>
@@ -929,7 +930,7 @@
     </div>
 
     <script>
-        // =================== متغیرهای اصلی ===================
+        // عناصر DOM
         const provinceSelect = document.getElementById('province');
         const marketerNameSelect = document.getElementById('marketer-name');
         const businessTypeContainer = document.getElementById('business-type-container');
@@ -972,114 +973,12 @@
         // متغیرهای وضعیت
         let stream = null;
         let locationData = null;
-        let currentCameraMode = "environment";
-        let currentRequestType = null;
-        let negotiationType = "حضوری";
+        let currentCameraMode = "environment"; // حالت پیش‌فرض دوربین عقب
+        let currentRequestType = null; // 'start', 'end'
+        let negotiationType = "حضوری"; // فقط مذاکره حضوری
         let user = null;
         let businessList = [];
         let usingManualInput = false;
-        let faCollator = null; // بعداً در onload مقداردهی می‌شود
-        
-        // =================== تنظیمات مهم ===================
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyYyDDbd7bSeVvshB8PwFH4ZIU7ws0J1T_UOpxfvhZd9-VQEQwlNxYjKS_tiWGCPUNAjg/exec';
-        
-        // =================== توابع اصلاح شده ===================
-        
-        // تابع اصلاح شده برای به‌روزرسانی نام مجموعه‌ها
-        async function updateBusinessNames() {
-            if (currentRequestType === 'end' && provinceSelect.value) {
-                businessNameEndSelect.innerHTML = '<option value="" selected disabled>در حال دریافت لیست...</option>';
-                await loadBusinessNames(provinceSelect.value);
-            }
-        }
-        
-        // تابع اصلاح شده برای بارگیری نام مجموعه‌ها
-        async function loadBusinessNames(province = 'all') {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            try {
-                showStatus('در حال دریافت لیست مجموعه‌ها...', 'processing');
-                
-                const params = new URLSearchParams({ province });
-                const url = `${GAS_URL}?${params.toString()}`;
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    signal: controller.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(`خطای HTTP: ${response.status}`);
-                }
-
-                const raw = await response.json();
-                const items = normalizeGASResponse(raw);
-                
-                if (!items || items.length === 0) {
-                    throw new Error('داده‌ای برای این استان یافت نشد');
-                }
-
-                let businessNames = items
-                    .map(i => i && i.name)
-                    .filter(Boolean);
-
-                // حذف موارد تکراری و مرتب‌سازی
-                businessNames = Array.from(new Set(businessNames)).sort(faCollator.compare);
-
-                businessList = businessNames;
-                fillBusinessSelect(businessNameEndSelect, businessNames);
-                
-                showStatus('لیست مجموعه‌ها دریافت شد', 'success');
-            } catch (error) {
-                console.error('خطا در دریافت لیست:', error);
-                
-                // نمایش پیام خطای مناسب
-                const errorMsg = error.message.includes('داده‌ای') ? 
-                    error.message : 'خطا در ارتباط با سرور';
-                
-                showStatus(`خطا: ${errorMsg}`, 'error');
-                
-                businessNameEndSelect.innerHTML = `
-                    <option value="" selected disabled>${errorMsg}</option>
-                    <option value="manual">ورود دستی نام مجموعه</option>
-                `;
-            } finally {
-                clearTimeout(timeoutId);
-            }
-        }
-        
-        // تابع اصلاح شده برای پردازش پاسخ سرور
-        function normalizeGASResponse(raw) {
-            if (raw && typeof raw === 'object') {
-                if (raw.success === true && Array.isArray(raw.data)) {
-                    return raw.data;
-                }
-                throw new Error(raw.error || 'خطا در پردازش پاسخ سرور');
-            }
-            throw new Error('ساختار پاسخ سرور نامعتبر است');
-        }
-        
-        // تابع اصلاح شده برای پرکردن لیست نام مجموعه‌ها
-        function fillBusinessSelect(selectEl, businessNames) {
-            selectEl.innerHTML = '<option value="" selected disabled>نام مجموعه را انتخاب کنید</option>';
-        
-            businessNames.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                selectEl.appendChild(option);
-            });
-        
-            // گزینه «ورود دستی»
-            const manualOption = document.createElement('option');
-            manualOption.value = 'manual';
-            manualOption.textContent = 'ورود دستی نام مجموعه';
-            selectEl.appendChild(manualOption);
-        }
-        
-        // =================== سایر توابع بدون تغییر ===================
         
         // مدیریت نمایش دلایل عدم تمایل
         negotiationResultSelect.addEventListener('change', function() {
@@ -1130,6 +1029,14 @@
             managerPhoneInput.classList.remove('input-error');
             phoneError.style.display = 'none';
             return true;
+        }
+        
+        // تابع برای به‌روزرسانی نام مجموعه‌ها
+        function updateBusinessNames() {
+            // فقط برای درخواست پایان مذاکره و زمانی که استان انتخاب شده
+            if (currentRequestType === 'end' && provinceSelect.value) {
+                loadBusinessNames(provinceSelect.value);
+            }
         }
         
         // مدیریت نمایش فیلدها بر اساس نوع درخواست
@@ -1190,11 +1097,6 @@
             setActiveRequestType('end');
             updateFormFields();
             submitBtn.disabled = false;
-            
-            // بارگیری اولیه نام مجموعه‌ها
-            if (provinceSelect.value) {
-                updateBusinessNames();
-            }
         });
         
         // فعال‌سازی دوربین
@@ -1655,16 +1557,102 @@
             document.querySelector('.g_id_signin').style.display = 'none';
         }
         
-        // =================== مدیریت رویدادها ===================
+        // --- تنظیمات ---
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyYyDDbd7bSeVvshB8PwFH4ZIU7ws0J1T_UOpxfvhZd9-VQEQwlNxYjKS_tiWGCPUNAjg/exec';
         
-        // رویداد تغییر استان (اصلاح شده)
-        provinceSelect.addEventListener('change', async function() {
-            if (currentRequestType === 'end') {
-                await updateBusinessNames();
+        // Collator برای مرتب‌سازی حروف فارسی
+        const faCollator = new Intl.Collator('fa', { sensitivity: 'base', numeric: true });
+        
+        // --- توابع کمکی ---
+        function normalizeGASResponse(raw) {
+            if (Array.isArray(raw)) {
+                return raw;
             }
-        });
         
-        // رویداد تغییر انتخاب نام مجموعه
+            if (raw && typeof raw === 'object') {
+                const ok =
+                    raw.success === true ||
+                    (typeof raw.status === 'string' && raw.status.toLowerCase() === 'success');
+        
+                if (ok && Array.isArray(raw.data)) {
+                    return raw.data;
+                }
+            }
+        
+            throw new Error('ساختار داده نامعتبر است');
+        }
+        
+        function fillBusinessSelect(selectEl, businessNames) {
+            selectEl.innerHTML = '<option value="" selected disabled>نام مجموعه را انتخاب کنید</option>';
+        
+            businessNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                selectEl.appendChild(option);
+            });
+        
+            // گزینه «ورود دستی»
+            const manualOption = document.createElement('option');
+            manualOption.value = 'manual';
+            manualOption.textContent = 'ورود دستی نام مجموعه';
+            selectEl.appendChild(manualOption);
+        }
+        
+        // --- تابع اصلی جایگزین ---
+        async function loadBusinessNames(province = 'all') {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+            try {
+                showStatus('در حال دریافت لیست مجموعه‌ها...', 'processing');
+        
+                const params = new URLSearchParams({ province });
+                const url = `${GAS_URL}?${params.toString()}`;
+        
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: controller.signal
+                });
+        
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+        
+                const raw = await response.json();
+                console.log('داده دریافتی خام:', raw);
+        
+                const items = normalizeGASResponse(raw);
+                let businessNames = items
+                    .map(i => i && i.name)
+                    .filter(Boolean);
+        
+                // حذف موارد تکراری و مرتب‌سازی
+                businessNames = Array.from(new Set(businessNames)).sort(faCollator.compare);
+        
+                if (businessNames.length === 0) {
+                    throw new Error('هیچ مجموعه‌ای برای این استان یافت نشد');
+                }
+        
+                businessList = businessNames;
+                fillBusinessSelect(businessNameEndSelect, businessNames);
+        
+                showStatus('لیست مجموعه‌ها دریافت شد', 'success');
+            } catch (error) {
+                console.error('خطا در دریافت لیست:', error);
+                showStatus('خطا در دریافت لیست مجموعه‌ها: ' + error.message, 'error');
+        
+                businessNameEndSelect.innerHTML = `
+                    <option value="" selected disabled>خطا در دریافت لیست</option>
+                    <option value="manual">ورود دستی نام مجموعه</option>
+                `;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+        
+        // نمایش فیلد ورود دستی نام مجموعه
         businessNameEndSelect.addEventListener('change', function() {
             if (this.value === "manual") {
                 manualInputContainer.style.display = 'block';
@@ -1677,18 +1665,15 @@
             }
         });
         
-        // =================== مقداردهی اولیه ===================
+        // رویداد تغییر استان
+        provinceSelect.addEventListener('change', function() {
+            updateBusinessNames();
+        });
+        
+        // مقداردهی اولیه
         window.onload = function() {
-            // تنظیم collator برای مرتب‌سازی فارسی
-            faCollator = new Intl.Collator('fa', { 
-                sensitivity: 'base', 
-                numeric: true 
-            });
-            
-            // سایر تنظیمات اولیه
+            // تنظیم callback برای ورود گوگل
             window.handleCredentialResponse = handleCredentialResponse;
-            setInterval(toggleSystemState, 60000);
-            toggleSystemState();
         };
     </script>
 </body>
