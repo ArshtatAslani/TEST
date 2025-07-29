@@ -1599,59 +1599,77 @@
         }
         
         // --- تابع اصلی برای بارگذاری نام مجموعه‌ها ---
-        async function loadBusinessNames(province = 'all') {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-        
-            try {
-                showStatus('در حال دریافت لیست مجموعه‌ها...', 'processing');
-        
-                const params = new URLSearchParams({ province });
-                const url = `${GAS_URL}?${params.toString()}`;
-                console.log('در حال ارسال درخواست به:', url); // لاگ برای دیباگ
-        
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    signal: controller.signal
-                });
-        
-                if (!response.ok) {
-                    throw new Error(`خطای HTTP: ${response.status}`);
-                }
-        
-                const raw = await response.json();
-                console.log('داده دریافتی خام:', raw);
-        
-                const items = normalizeGASResponse(raw);
-                let businessNames = items
-                    .map(i => i && i.name)
-                    .filter(Boolean);
-        
-                // حذف موارد تکراری و مرتب‌سازی
-                businessNames = Array.from(new Set(businessNames)).sort(faCollator.compare);
-        
-                if (businessNames.length === 0) {
-                    throw new Error('هیچ مجموعه‌ای برای این استان یافت نشد');
-                }
-        
-                businessList = businessNames;
-                console.log('لیست نام‌های مجموعه:', businessNames); // لاگ برای دیباگ
-                fillBusinessSelect(businessNameEndSelect, businessNames);
-        
-                showStatus('لیست مجموعه‌ها دریافت شد', 'success');
-            } catch (error) {
-                console.error('خطا در دریافت لیست:', error);
-                showStatus('خطا در دریافت لیست مجموعه‌ها: ' + error.message, 'error');
-        
-                businessNameEndSelect.innerHTML = `
-                    <option value="" selected disabled>خطا در دریافت لیست</option>
-                    <option value="manual">ورود دستی نام مجموعه</option>
-                `;
-            } finally {
-                clearTimeout(timeoutId);
+     async function loadBusinessNames(province = 'all') {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    try {
+        showStatus('در حال دریافت لیست مجموعه‌ها...', 'processing');
+
+        const params = new URLSearchParams({ province });
+        const url = `${GAS_URL}?${params.toString()}`;
+        console.log('در حال ارسال درخواست به:', url);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            // شناسایی نوع خطای HTTP
+            let errorMessage = `خطای HTTP: ${response.status}`;
+            if (response.status === 403) {
+                errorMessage = 'دسترسی غیرمجاز (403). لطفاً تنظیمات دسترسی سرور را بررسی کنید.';
+            } else if (response.status === 404) {
+                errorMessage = 'سرور یافت نشد (404). لطفاً URL را بررسی کنید.';
+            } else if (response.status === 500) {
+                errorMessage = 'خطای سرور (500). لطفاً بعداً تلاش کنید.';
             }
+            throw new Error(errorMessage);
         }
+
+        const raw = await response.json();
+        console.log('داده دریافتی خام:', raw);
+
+        const items = normalizeGASResponse(raw);
+        let businessNames = items
+            .map(i => i && i.name)
+            .filter(Boolean);
+
+        // حذف موارد تکراری و مرتب‌سازی
+        businessNames = Array.from(new Set(businessNames)).sort(faCollator.compare);
+
+        businessList = businessNames;
+        console.log('لیست نام‌های مجموعه:', businessNames);
+
+        if (businessNames.length === 0) {
+            businessNameEndSelect.innerHTML = `
+                <option value="" selected disabled>هیچ مجموعه‌ای یافت نشد</option>
+                <option value="manual">ورود دستی نام مجموعه</option>
+            `;
+            showStatus('هیچ مجموعه‌ای برای این استان یافت نشد. لطفاً از گزینه ورود دستی استفاده کنید.', 'error');
+        } else {
+            fillBusinessSelect(businessNameEndSelect, businessNames);
+            showStatus('لیست مجموعه‌ها دریافت شد', 'success');
+        }
+    } catch (error) {
+        console.error('خطا در دریافت لیست:', error);
+        let errorMessage = error.message;
+        if (error.name === 'AbortError') {
+            errorMessage = 'زمان درخواست به پایان رسید. لطفاً اتصال اینترنت خود را بررسی کنید.';
+        } else if (error.message.includes('Failed to fetch')) {
+            errorMessage = 'خطای شبکه یا CORS. لطفاً اتصال اینترنت یا تنظیمات سرور را بررسی کنید.';
+        }
+        showStatus(`خطا در دریافت لیست مجموعه‌ها: ${errorMessage}`, 'error');
+        businessNameEndSelect.innerHTML = `
+            <option value="" selected disabled>خطا در دریافت لیست</option>
+            <option value="manual">ورود دستی نام مجموعه</option>
+        `;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
         
         // نمایش فیلد ورود دستی نام مجموعه
         businessNameEndSelect.addEventListener('change', function() {
