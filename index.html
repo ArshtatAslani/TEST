@@ -100,7 +100,7 @@
             color: #2c3e50;
         }
         
-        .input-group input, .input-group select {
+        .input-group input, .input-group select, .input-group textarea {
             width: 100%;
             padding: 15px 15px 15px 45px;
             border: 2px solid #ddd;
@@ -111,6 +111,11 @@
             appearance: none;
         }
         
+        .input-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
         .input-group i {
             position: absolute;
             left: 15px;
@@ -119,7 +124,7 @@
             color: #1a2980;
         }
         
-        .input-group input:focus, .input-group select:focus {
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
             border-color: #1a2980;
             outline: none;
             box-shadow: 0 0 0 3px rgba(26, 41, 128, 0.2);
@@ -158,7 +163,7 @@
             border: 3px solid #1a2980;
         }
         
-        #camera-feed {
+        #camera-feed, #preview-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -857,6 +862,13 @@
                         <option value="نیاز به فیچر خاص">نیاز به فیچر خاص</option>
                     </select>
                 </div>
+                
+                <!-- توضیحات -->
+                <div class="input-group">
+                    <label for="negotiation-description"><i class="fas fa-comment"></i> توضیحات</label>
+                    <i class="fas fa-comment-dots"></i>
+                    <textarea id="negotiation-description" placeholder="توضیحات خود را وارد نمایید..."></textarea>
+                </div>
             </div>
             
             <div class="section-divider"></div>
@@ -869,6 +881,7 @@
                         <p>دوربین عقب آماده است</p>
                     </div>
                     <video id="camera-feed" autoplay playsinline></video>
+                    <img id="preview-image" alt="Captured Image">
                     <div class="camera-rotation-control" id="rotate-camera">
                         <i class="fas fa-sync-alt"></i>
                     </div>
@@ -880,6 +893,9 @@
                     </button>
                     <button id="capture-btn" class="btn btn-secondary" disabled>
                         <i class="fas fa-camera-retro"></i> عکس‌برداری
+                    </button>
+                    <button id="retake-btn" class="btn btn-secondary" style="display: none;">
+                        <i class="fas fa-redo"></i> عکس‌برداری مجدد
                     </button>
                 </div>
             </div>
@@ -947,11 +963,14 @@
         const managerNameInput = document.getElementById('manager-name');
         const managerPhoneInput = document.getElementById('manager-phone');
         const phoneError = document.getElementById('phone-error');
+        const negotiationDescriptionInput = document.getElementById('negotiation-description');
         const startBtn = document.getElementById('start-btn');
         const endBtn = document.getElementById('end-btn');
         const startCameraBtn = document.getElementById('start-camera');
         const captureBtn = document.getElementById('capture-btn');
+        const retakeBtn = document.getElementById('retake-btn');
         const cameraFeed = document.getElementById('camera-feed');
+        const previewImage = document.getElementById('preview-image');
         const submitBtn = document.getElementById('submit-btn');
         const statusMessage = document.getElementById('status-message');
         const latitudeValue = document.getElementById('latitude-value');
@@ -975,6 +994,7 @@
         let user = null;
         let businessList = [];
         let usingManualInput = false;
+        let capturedImageData = null; // ذخیره تصویر گرفته شده
         
         // مدیریت نمایش دلایل عدم تمایل
         negotiationResultSelect.addEventListener('change', function() {
@@ -1115,8 +1135,10 @@
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 cameraFeed.srcObject = stream;
                 cameraFeed.style.display = 'block';
+                previewImage.style.display = 'none';
                 document.querySelector('.camera-placeholder').style.display = 'none';
                 captureBtn.disabled = false;
+                retakeBtn.style.display = 'none';
                 startCameraBtn.disabled = true;
                 startCameraBtn.innerHTML = '<i class="fas fa-check"></i> دوربین فعال شد';
                 
@@ -1144,6 +1166,35 @@
             showStatus('در حال دریافت موقعیت جغرافیایی...', 'processing');
             getLocationBtn.disabled = true;
             getLocation();
+        });
+        
+        // عکس‌برداری
+        captureBtn.addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = cameraFeed.videoWidth;
+            canvas.height = cameraFeed.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+            
+            // ذخیره تصویر گرفته شده
+            capturedImageData = canvas.toDataURL('image/jpeg');
+            
+            // نمایش پیش‌نمایش
+            previewImage.src = capturedImageData;
+            previewImage.style.display = 'block';
+            cameraFeed.style.display = 'none';
+            document.querySelector('.camera-placeholder').style.display = 'none';
+            
+            // غیرفعال کردن دکمه عکس‌برداری و نمایش دکمه عکس‌برداری مجدد
+            captureBtn.disabled = true;
+            retakeBtn.style.display = 'flex';
+        });
+        
+        // عکس‌برداری مجدد
+        retakeBtn.addEventListener('click', () => {
+            capturedImageData = null;
+            previewImage.style.display = 'none';
+            startCamera();
         });
         
         // دریافت موقعیت جغرافیایی
@@ -1229,6 +1280,11 @@
                     showStatus('لطفاً نام مجموعه را وارد کنید', 'error');
                     return false;
                 }
+                
+                if (!capturedImageData) {
+                    showStatus('لطفاً یک عکس بگیرید', 'error');
+                    return false;
+                }
             } else if (currentRequestType === 'end') {
                 // بررسی نام مجموعه (انتخاب از لیست یا ورود دستی)
                 if (businessNameEndSelect.value === "manual") {
@@ -1308,6 +1364,7 @@
                     params.append('entry.475047817', businessNameInput.value.trim()); // نام مجموعه
                     params.append('entry.145698669', 'شروع مذاکره'); // نوع درخواست
                     params.append('entry.1236889664', marketerNameSelect.value); // نام بازاریاب
+                    params.append('entry.1191047036', capturedImageData); // تصویر
                 } else if (currentRequestType === 'end') {
                     // استفاده از نام مجموعه از لیست یا ورود دستی
                     let businessName;
@@ -1331,6 +1388,7 @@
                     params.append('entry.573458779', negotiationResultSelect.value); // نتیجه مذاکره
                     params.append('entry.145698669', 'پایان مذاکره'); // نوع درخواست
                     params.append('entry.1236889664', marketerNameSelect.value); // نام بازاریاب
+                    params.append('entry.1191047036', negotiationDescriptionInput.value.trim()); // توضیحات
                     
                     // ارسال دلیل عدم تمایل اگر انتخاب شده باشد
                     if (negotiationResultSelect.value === "عدم تمایل" && disinterestReasonSelect.value) {
@@ -1388,6 +1446,7 @@
             negotiationResultSelect.selectedIndex = 0;
             disinterestReasonContainer.style.display = 'none';
             disinterestReasonSelect.selectedIndex = 0;
+            negotiationDescriptionInput.value = '';
             
             submitBtn.disabled = true;
             getLocationBtn.disabled = false;
@@ -1397,10 +1456,13 @@
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 cameraFeed.style.display = 'none';
+                previewImage.style.display = 'none';
                 document.querySelector('.camera-placeholder').style.display = 'block';
                 startCameraBtn.disabled = false;
                 startCameraBtn.innerHTML = '<i class="fas fa-video"></i> فعال‌سازی دوربین';
                 captureBtn.disabled = true;
+                retakeBtn.style.display = 'none';
+                capturedImageData = null;
             }
             
             // ریست موقعیت
@@ -1500,10 +1562,12 @@
                 vendorSoftwareSelect.disabled = true;
                 negotiationResultSelect.disabled = true;
                 disinterestReasonSelect.disabled = true;
+                negotiationDescriptionInput.disabled = true;
                 startBtn.disabled = true;
                 endBtn.disabled = true;
                 startCameraBtn.disabled = true;
                 captureBtn.disabled = true;
+                retakeBtn.disabled = true;
                 getLocationBtn.disabled = true;
                 submitBtn.disabled = true;
                 rotateCameraBtn.disabled = true;
@@ -1512,6 +1576,7 @@
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     cameraFeed.style.display = 'none';
+                    previewImage.style.display = 'none';
                     document.querySelector('.camera-placeholder').style.display = 'block';
                 }
             } else {
@@ -1527,10 +1592,12 @@
                 vendorSoftwareSelect.disabled = false;
                 negotiationResultSelect.disabled = false;
                 disinterestReasonSelect.disabled = false;
+                negotiationDescriptionInput.disabled = false;
                 startBtn.disabled = false;
                 endBtn.disabled = false;
                 startCameraBtn.disabled = false;
                 captureBtn.disabled = true;
+                retakeBtn.disabled = false;
                 getLocationBtn.disabled = false;
                 submitBtn.disabled = true;
                 rotateCameraBtn.disabled = false;
