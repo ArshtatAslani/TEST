@@ -1599,76 +1599,105 @@
             selectEl.appendChild(manualOption);
         }
         
-        // --- تابع اصلی جایگزین ---
-        async function loadBusinessNames(province = 'all') {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+       async function loadBusinessNames(province = 'all') {
+    try {
+        // نمایش پیام در حال بارگیری
+        businessNameEndSelect.innerHTML = '<option value="" selected disabled>در حال دریافت لیست...</option>';
+        showStatus('در حال دریافت لیست مجموعه‌ها از سرور...', 'processing');
         
-            try {
-                showStatus('در حال دریافت لیست مجموعه‌ها...', 'processing');
+        // ساخت URL با پارامتر استان
+        const params = new URLSearchParams({ province });
+        const url = `${GAS_URL}?${params.toString()}`;
         
-                const params = new URLSearchParams({ province });
-                const url = `${GAS_URL}?${params.toString()}`;
-        
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' },
-                    signal: controller.signal
-                });
-        
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-        
-                const raw = await response.json();
-                console.log('داده دریافتی خام:', raw);
-        
-                const items = normalizeGASResponse(raw);
-                let businessNames = items
-                    .map(i => i && i.name)
-                    .filter(Boolean);
-        
-                // حذف موارد تکراری و مرتب‌سازی
-                businessNames = Array.from(new Set(businessNames)).sort(faCollator.compare);
-        
-                if (businessNames.length === 0) {
-                    throw new Error('هیچ مجموعه‌ای برای این استان یافت نشد');
-                }
-        
-                businessList = businessNames;
-                fillBusinessSelect(businessNameEndSelect, businessNames);
-        
-                showStatus('لیست مجموعه‌ها دریافت شد', 'success');
-            } catch (error) {
-                console.error('خطا در دریافت لیست:', error);
-                showStatus('خطا در دریافت لیست مجموعه‌ها: ' + error.message, 'error');
-        
-                businessNameEndSelect.innerHTML = `
-                    <option value="" selected disabled>خطا در دریافت لیست</option>
-                    <option value="manual">ورود دستی نام مجموعه</option>
-                `;
-            } finally {
-                clearTimeout(timeoutId);
-            }
+        // ارسال درخواست با مدیریت خطا
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        // بررسی وضعیت پاسخ
+        if (!response.ok) {
+            throw new Error(`خطای سرور: ${response.status}`);
         }
+
+        // پردازش پاسخ JSON
+        const result = await response.json();
         
-        // نمایش فیلد ورود دستی نام مجموعه
-        businessNameEndSelect.addEventListener('change', function() {
-            if (this.value === "manual") {
-                manualInputContainer.style.display = 'block';
-                manualBusinessNameInput.value = '';
-                manualBusinessNameInput.focus();
-                usingManualInput = true;
-            } else {
-                manualInputContainer.style.display = 'none';
-                usingManualInput = false;
-            }
-        });
+        // بررسی ساختار داده دریافتی
+        if (!result || !result.success || !Array.isArray(result.data)) {
+            throw new Error('ساختار داده دریافتی نامعتبر است');
+        }
+
+        // استخراج و پردازش نام‌ها
+        const businessNames = result.data
+            .map(item => item?.name)
+            .filter(name => name && name.trim() !== '');
+            
+        if (businessNames.length === 0) {
+            throw new Error('هیچ مجموعه‌ای برای این استان یافت نشد');
+        }
+
+        // حذف موارد تکراری و مرتب‌سازی
+        const uniqueNames = [...new Set(businessNames)].sort(faCollator.compare);
         
-        // رویداد تغییر استان
-        provinceSelect.addEventListener('change', function() {
-            updateBusinessNames();
-        });
+        // پر کردن لیست
+        fillBusinessSelect(businessNameEndSelect, uniqueNames);
+        
+        showStatus('لیست مجموعه‌ها با موفقیت دریافت شد', 'success');
+        
+    } catch (error) {
+        console.error('خطا در دریافت لیست:', error);
+        
+        // نمایش پیام خطای مناسب به کاربر
+        const errorMessage = error.message.includes('سرور') ? 
+            'خطا در ارتباط با سرور. لطفاً مجدداً تلاش کنید' : 
+            'خطا در دریافت اطلاعات';
+        
+        businessNameEndSelect.innerHTML = `
+            <option value="" selected disabled>${errorMessage}</option>
+            <option value="manual">ورود دستی نام مجموعه</option>
+        `;
+        
+        showStatus(errorMessage, 'error');
+    }
+}
+
+// تابع پر کردن select با گزینه‌ها
+function fillBusinessSelect(selectEl, items) {
+    selectEl.innerHTML = '<option value="" selected disabled>نام مجموعه را انتخاب کنید</option>';
+    
+    items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        selectEl.appendChild(option);
+    });
+    
+    // افزودن گزینه ورود دستی
+    const manualOption = document.createElement('option');
+    manualOption.value = 'manual';
+    manualOption.textContent = 'ورود دستی نام مجموعه';
+    selectEl.appendChild(manualOption);
+}
+
+        
+    // رویداد تغییر استان
+provinceSelect.addEventListener('change', async function() {
+    if (currentRequestType === 'end' && this.value) {
+        await loadBusinessNames(this.value);
+    }
+});
+
+// رویداد کلیک بر روی گزینه پایان مذاکره
+endBtn.addEventListener('click', async function() {
+    currentRequestType = 'end';
+    setActiveRequestType('end');
+    updateFormFields();
+    
+    if (provinceSelect.value) {
+        await loadBusinessNames(provinceSelect.value);
+    }
+});
         
         // مقداردهی اولیه
         window.onload = function() {
