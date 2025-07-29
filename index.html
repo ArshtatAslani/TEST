@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سامانه مدیریت مذاکرات | نسخه اصلاح شده</title>
+    <title>سامانه مدیریت مذاکرات | اسنپ استور</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
@@ -996,6 +996,10 @@
         let usingManualInput = false;
         let capturedImageData = null; // ذخیره تصویر گرفته شده
         
+        // URL برای Google Apps Script و فرم گوگل
+        const GAS_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbxqIzGI6_F8jubXKkwR5sVs-LEJJ8te630PkAk9g_mULJC1iVgaPVYDSue-gbpgUicL/exec'; // جایگذاری با URL واقعی Web App
+        const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfd8rOHSxu0dhU0jrJMYsh9G8KI_tjEYqYGJvb4jyUFQ8YMaw/formResponse';
+        
         // مدیریت نمایش دلایل عدم تمایل
         negotiationResultSelect.addEventListener('change', function() {
             if (this.value === "عدم تمایل") {
@@ -1018,30 +1022,17 @@
         
         // اعتبارسنجی شماره موبایل
         managerPhoneInput.addEventListener('input', function() {
-            // حذف کاراکترهای غیرعددی
             this.value = this.value.replace(/\D/g, '');
-            
-            // اعتبارسنجی شماره موبایل
             validatePhone();
         });
         
         function validatePhone() {
             const phone = managerPhoneInput.value;
-            
-            // بررسی طول شماره
-            if (phone.length !== 11) {
+            if (phone.length !== 11 || !/^\d+$/.test(phone)) {
                 managerPhoneInput.classList.add('input-error');
                 phoneError.style.display = 'block';
                 return false;
             }
-            
-            // بررسی اینکه فقط عدد است
-            if (!/^\d+$/.test(phone)) {
-                managerPhoneInput.classList.add('input-error');
-                phoneError.style.display = 'block';
-                return false;
-            }
-            
             managerPhoneInput.classList.remove('input-error');
             phoneError.style.display = 'none';
             return true;
@@ -1049,7 +1040,6 @@
         
         // تابع برای به‌روزرسانی نام مجموعه‌ها
         function updateBusinessNames() {
-            // فقط برای درخواست پایان مذاکره و زمانی که استان انتخاب شده
             if (currentRequestType === 'end' && provinceSelect.value) {
                 loadBusinessNames(provinceSelect.value);
             }
@@ -1057,7 +1047,6 @@
         
         // مدیریت نمایش فیلدها بر اساس نوع درخواست
         function updateFormFields() {
-            // مخفی کردن همه بخش‌ها
             businessTypeContainer.style.display = 'none';
             businessNameContainer.style.display = 'none';
             endNegotiationSection.style.display = 'none';
@@ -1065,34 +1054,24 @@
             manualInputContainer.style.display = 'none';
             disinterestReasonContainer.style.display = 'none';
             otherSoftwareContainer.style.display = 'none';
+            cameraSection.style.display = 'none';
+            locationSection.style.display = 'block';
             
-            // نمایش فیلدهای بر اساس نوع درخواست
             if (currentRequestType === 'start') {
                 businessTypeContainer.style.display = 'block';
                 businessNameContainer.style.display = 'block';
+                cameraSection.style.display = 'block';
             } else if (currentRequestType === 'end') {
                 endNegotiationSection.style.display = 'block';
                 businessNameEndContainer.style.display = 'block';
-                // به‌روزرسانی لیست نام مجموعه‌ها
                 updateBusinessNames();
             }
-            
-            // نمایش دوربین فقط برای مذاکرات حضوری شروع
-            if (currentRequestType === 'start') {
-                cameraSection.style.display = 'block';
-            } else {
-                cameraSection.style.display = 'none';
-            }
-            
-            // نمایش موقعیت‌یابی برای همه مذاکرات حضوری
-            locationSection.style.display = 'block';
         }
         
         // تنظیم وضعیت دکمه‌های انتخاب نوع درخواست
         function setActiveRequestType(type) {
             startBtn.classList.remove('active');
             endBtn.classList.remove('active');
-            
             if (type === 'start') {
                 startBtn.classList.add('active');
             } else if (type === 'end') {
@@ -1118,7 +1097,6 @@
         // فعال‌سازی دوربین
         async function startCamera() {
             try {
-                // تنظیمات برای استفاده از دوربین
                 const constraints = {
                     video: {
                         facingMode: currentCameraMode,
@@ -1142,10 +1120,8 @@
                 startCameraBtn.disabled = true;
                 startCameraBtn.innerHTML = '<i class="fas fa-check"></i> دوربین فعال شد';
                 
-                // تنظیم عنوان دوربین
                 const cameraType = currentCameraMode === "environment" ? "عقب" : "جلو";
                 document.querySelector('.camera-placeholder p').textContent = `دوربین ${cameraType} فعال است`;
-                
             } catch (err) {
                 showStatus(`خطا در دسترسی به دوربین: ${err.message}`, 'error');
                 console.error('خطای دوربین:', err);
@@ -1176,16 +1152,11 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
             
-            // ذخیره تصویر گرفته شده
-            capturedImageData = canvas.toDataURL('image/jpeg');
-            
-            // نمایش پیش‌نمایش
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.8); // کاهش کیفیت برای کاهش حجم
             previewImage.src = capturedImageData;
             previewImage.style.display = 'block';
             cameraFeed.style.display = 'none';
             document.querySelector('.camera-placeholder').style.display = 'none';
-            
-            // غیرفعال کردن دکمه عکس‌برداری و نمایش دکمه عکس‌برداری مجدد
             captureBtn.disabled = true;
             retakeBtn.style.display = 'flex';
         });
@@ -1215,7 +1186,6 @@
                         showStatus('موقعیت جغرافیایی دریافت شد', 'success');
                         getLocationBtn.innerHTML = '<i class="fas fa-check"></i> موقعیت دریافت شد';
                         
-                        // فعال کردن دکمه ارسال
                         if (validateForm()) {
                             submitBtn.disabled = false;
                         }
@@ -1243,33 +1213,23 @@
             const currentHour = now.getHours();
             const currentMinute = now.getMinutes();
             const currentTotalMinutes = currentHour * 60 + currentMinute;
-            
-            // بازه غیرفعال: از 00:30 تا 5:30
             const disableStart = 0 * 60 + 30; // 00:30
             const disableEnd = 5 * 60 + 30;   // 05:30
-            
-            // اگر زمان فعلی بین 00:30 تا 5:30 باشد
-            if (currentTotalMinutes >= disableStart && currentTotalMinutes < disableEnd) {
-                return true;
-            }
-            return false;
+            return currentTotalMinutes >= disableStart && currentTotalMinutes < disableEnd;
         }
         
         // اعتبارسنجی فرم
         function validateForm() {
-            // اعتبارسنجی استان
             if (!provinceSelect.value) {
                 showStatus('لطفاً استان خود را انتخاب کنید', 'error');
                 return false;
             }
             
-            // اعتبارسنجی نام بازاریاب
             if (!marketerNameSelect.value) {
                 showStatus('لطفاً نام بازاریاب را انتخاب کنید', 'error');
                 return false;
             }
             
-            // اعتبارسنجی بر اساس نوع درخواست
             if (currentRequestType === 'start') {
                 if (!businessTypeSelect.value) {
                     showStatus('لطفاً نوع مجموعه را انتخاب کنید', 'error');
@@ -1286,7 +1246,6 @@
                     return false;
                 }
             } else if (currentRequestType === 'end') {
-                // بررسی نام مجموعه (انتخاب از لیست یا ورود دستی)
                 if (businessNameEndSelect.value === "manual") {
                     if (!manualBusinessNameInput.value.trim()) {
                         showStatus('لطفاً نام مجموعه را وارد کنید', 'error');
@@ -1302,7 +1261,6 @@
                     return false;
                 }
                 
-                // اعتبارسنجی شماره موبایل
                 if (!validatePhone()) {
                     showStatus('شماره تماس باید 11 رقمی و فقط شامل عدد باشد', 'error');
                     return false;
@@ -1313,7 +1271,6 @@
                     return false;
                 }
                 
-                // اگر "سایر" انتخاب شده و فیلد نام نرم افزار خالی است
                 if (vendorSoftwareSelect.value === "سایر" && !otherSoftwareNameInput.value.trim()) {
                     showStatus('لطفاً نام نرم افزار را وارد کنید', 'error');
                     return false;
@@ -1324,7 +1281,6 @@
                     return false;
                 }
                 
-                // اگر "عدم تمایل" انتخاب شده باشد، دلیل باید انتخاب شود
                 if (negotiationResultSelect.value === "عدم تمایل" && !disinterestReasonSelect.value) {
                     showStatus('لطفاً دلیل عدم تمایل را انتخاب کنید', 'error');
                     return false;
@@ -1334,9 +1290,34 @@
             return true;
         }
         
-        // ثبت حضور و ارسال به گوگل فرم با استفاده از Fetch API
+        // تابع آپلود تصویر به Google Drive
+        async function uploadImageToDrive(imageData) {
+            try {
+                showStatus('در حال آپلود تصویر...', 'processing');
+                const response = await fetch(GAS_UPLOAD_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showStatus('تصویر با موفقیت آپلود شد', 'success');
+                    return result.url;
+                } else {
+                    throw new Error(result.error || 'خطا در آپلود تصویر');
+                }
+            } catch (error) {
+                showStatus(`خطا در آپلود تصویر: ${error.message}`, 'error');
+                console.error('خطای آپلود تصویر:', error);
+                throw error;
+            }
+        }
+        
+        // ثبت اطلاعات در گوگل فرم
         submitBtn.addEventListener('click', async () => {
-            // اعتبارسنجی فرم
             if (!validateForm()) {
                 return;
             }
@@ -1346,63 +1327,46 @@
                 return;
             }
             
-            showStatus('در حال ارسال اطلاعات به سرور...', 'processing');
             submitBtn.disabled = true;
+            showStatus('در حال ارسال اطلاعات به سرور...', 'processing');
             
             try {
-                // ساخت URL برای ارسال به گوگل فرم
-                const formUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSfd8rOHSxu0dhU0jrJMYsh9G8KI_tjEYqYGJvb4jyUFQ8YMaw/formResponse';
+                let imageUrl = '';
+                if (currentRequestType === 'start' && capturedImageData) {
+                    imageUrl = await uploadImageToDrive(capturedImageData);
+                }
                 
-                // ساخت پارامترهای ارسالی
                 const params = new URLSearchParams();
                 params.append('entry.56597741', provinceSelect.value); // استان
-                params.append('entry.400737767', negotiationType); // نوع مذاکره (همیشه حضوری)
+                params.append('entry.400737767', negotiationType); // نوع مذاکره
                 
-                // اطلاعات بر اساس نوع درخواست
                 if (currentRequestType === 'start') {
                     params.append('entry.367554561', businessTypeSelect.value); // نوع مجموعه
                     params.append('entry.475047817', businessNameInput.value.trim()); // نام مجموعه
                     params.append('entry.145698669', 'شروع مذاکره'); // نوع درخواست
                     params.append('entry.1236889664', marketerNameSelect.value); // نام بازاریاب
-                    params.append('entry.1191047036', capturedImageData); // تصویر
+                    params.append('entry.1190808031', imageUrl); // لینک تصویر
                 } else if (currentRequestType === 'end') {
-                    // استفاده از نام مجموعه از لیست یا ورود دستی
-                    let businessName;
-                    if (businessNameEndSelect.value === "manual") {
-                        businessName = manualBusinessNameInput.value.trim();
-                    } else {
-                        businessName = businessNameEndSelect.value;
-                    }
-                    
+                    let businessName = businessNameEndSelect.value === "manual" ? manualBusinessNameInput.value.trim() : businessNameEndSelect.value;
                     params.append('entry.475047817', businessName); // نام مجموعه
                     params.append('entry.632146796', managerNameInput.value.trim()); // نام مدیریت
                     params.append('entry.1208820368', managerPhoneInput.value.trim()); // شماره تماس مدیریت
-                    
-                    // نرم افزار فعلی - اگر "سایر" انتخاب شده، از فیلد دیگر استفاده شود
-                    let softwareValue = vendorSoftwareSelect.value;
-                    if (vendorSoftwareSelect.value === "سایر") {
-                        softwareValue = otherSoftwareNameInput.value.trim();
-                    }
+                    let softwareValue = vendorSoftwareSelect.value === "سایر" ? otherSoftwareNameInput.value.trim() : vendorSoftwareSelect.value;
                     params.append('entry.2112447463', softwareValue); // نرم‌افزار فعلی
-                    
                     params.append('entry.573458779', negotiationResultSelect.value); // نتیجه مذاکره
                     params.append('entry.145698669', 'پایان مذاکره'); // نوع درخواست
                     params.append('entry.1236889664', marketerNameSelect.value); // نام بازاریاب
                     params.append('entry.1191047036', negotiationDescriptionInput.value.trim()); // توضیحات
-                    
-                    // ارسال دلیل عدم تمایل اگر انتخاب شده باشد
                     if (negotiationResultSelect.value === "عدم تمایل" && disinterestReasonSelect.value) {
                         params.append('entry.1245998613', disinterestReasonSelect.value); // دلیل عدم تمایل
                     }
                 }
                 
-                // اطلاعات موقعیت (همیشه حضوری)
                 params.append('entry.231075143', locationData.latitude); // عرض جغرافیایی
                 params.append('entry.882095543', locationData.longitude); // طول جغرافیایی
                 params.append('entry.555772584', locationData.accuracy); // دقت
                 
-                // ارسال درخواست POST
-                await fetch(formUrl, {
+                const response = await fetch(FORM_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
@@ -1411,19 +1375,14 @@
                     mode: 'no-cors'
                 });
                 
-                // نمایش انیمیشن موفقیت
                 showSuccessAnimation();
-                
-                // نمایش پیام موفقیت
                 showStatus('اطلاعات با موفقیت به سرور ارسال شد!', 'success');
                 
-                // ریست فرم
                 setTimeout(() => {
                     resetForm();
-                }, 2000);
-                
+                }, 5000);
             } catch (error) {
-                showStatus('خطا در ارسال اطلاعات: ' + error.message, 'error');
+                showStatus(`خطا در ارسال اطلاعات: ${error.message}`, 'error');
                 submitBtn.disabled = false;
                 console.error('خطای ارسال:', error);
             }
@@ -1452,7 +1411,6 @@
             getLocationBtn.disabled = false;
             getLocationBtn.innerHTML = '<i class="fas fa-location-arrow"></i> دریافت موقعیت جغرافیایی';
             
-            // توقف دوربین
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 cameraFeed.style.display = 'none';
@@ -1465,13 +1423,11 @@
                 capturedImageData = null;
             }
             
-            // ریست موقعیت
             locationData = null;
             latitudeValue.textContent = '---';
             longitudeValue.textContent = '---';
             accuracyValue.textContent = '---';
             
-            // ریست نوع درخواست
             startBtn.classList.remove('active');
             endBtn.classList.remove('active');
             currentRequestType = null;
@@ -1491,13 +1447,10 @@
         
         // انیمیشن موفقیت
         function showSuccessAnimation() {
-            // انیمیشن دکمه
             submitBtn.classList.add('success-animation');
             setTimeout(() => {
                 submitBtn.classList.remove('success-animation');
             }, 2000);
-            
-            // ایجاد کنفتی
             createConfetti();
         }
         
@@ -1519,7 +1472,6 @@
                 confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
                 confettiElement.appendChild(confetti);
                 
-                // انیمیشن سقوط
                 const animation = confetti.animate([
                     { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
                     { transform: `translateY(${window.innerHeight}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
@@ -1528,7 +1480,6 @@
                     easing: 'cubic-bezier(0,0.8,1,0.2)'
                 });
                 
-                // حذف المان پس از پایان انیمیشن
                 animation.onfinish = () => {
                     confetti.remove();
                     if (confettiElement.children.length === 0) {
@@ -1538,152 +1489,88 @@
             }
         }
         
-        // اجرای تابع toggleSystemState در هنگام لود و هر دقیقه
+        // مدیریت غیرفعال کردن سیستم
         window.addEventListener('load', () => {
-            // بررسی هر دقیقه
             setInterval(toggleSystemState, 60000);
             toggleSystemState();
         });
         
-        // تابع برای غیرفعال کردن کل سیستم در ساعات تعطیل
         function toggleSystemState() {
             const isDisabled = isInDisabledTime();
+            systemDisabledOverlay.style.display = isDisabled ? 'flex' : 'none';
             
-            if (isDisabled) {
-                systemDisabledOverlay.style.display = 'flex';
-                
-                // غیرفعال کردن تمام دکمه‌ها و عناصر ورودی
-                provinceSelect.disabled = true;
-                marketerNameSelect.disabled = true;
-                businessTypeSelect.disabled = true;
-                businessNameInput.disabled = true;
-                managerNameInput.disabled = true;
-                managerPhoneInput.disabled = true;
-                vendorSoftwareSelect.disabled = true;
-                negotiationResultSelect.disabled = true;
-                disinterestReasonSelect.disabled = true;
-                negotiationDescriptionInput.disabled = true;
-                startBtn.disabled = true;
-                endBtn.disabled = true;
-                startCameraBtn.disabled = true;
-                captureBtn.disabled = true;
-                retakeBtn.disabled = true;
-                getLocationBtn.disabled = true;
-                submitBtn.disabled = true;
-                rotateCameraBtn.disabled = true;
-                
-                // توقف دوربین اگر فعال باشد
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    cameraFeed.style.display = 'none';
-                    previewImage.style.display = 'none';
-                    document.querySelector('.camera-placeholder').style.display = 'block';
-                }
-            } else {
-                systemDisabledOverlay.style.display = 'none';
-                
-                // فعال کردن دوباره عناصر
-                provinceSelect.disabled = false;
-                marketerNameSelect.disabled = false;
-                businessTypeSelect.disabled = false;
-                businessNameInput.disabled = false;
-                managerNameInput.disabled = false;
-                managerPhoneInput.disabled = false;
-                vendorSoftwareSelect.disabled = false;
-                negotiationResultSelect.disabled = false;
-                disinterestReasonSelect.disabled = false;
-                negotiationDescriptionInput.disabled = false;
-                startBtn.disabled = false;
-                endBtn.disabled = false;
-                startCameraBtn.disabled = false;
-                captureBtn.disabled = true;
-                retakeBtn.disabled = false;
-                getLocationBtn.disabled = false;
-                submitBtn.disabled = true;
-                rotateCameraBtn.disabled = false;
+            const elements = [
+                provinceSelect, marketerNameSelect, businessTypeSelect, businessNameInput,
+                managerNameInput, managerPhoneInput, vendorSoftwareSelect, negotiationResultSelect,
+                disinterestReasonSelect, negotiationDescriptionInput, startBtn, endBtn,
+                startCameraBtn, captureBtn, retakeBtn, getLocationBtn, submitBtn, rotateCameraBtn
+            ];
+            
+            elements.forEach(el => el.disabled = isDisabled);
+            
+            if (isDisabled && stream) {
+                stream.getTracks().forEach(track => track.stop());
+                cameraFeed.style.display = 'none';
+                previewImage.style.display = 'none';
+                document.querySelector('.camera-placeholder').style.display = 'block';
             }
         }
         
         // مدیریت ورود با جیمیل
         function handleCredentialResponse(response) {
             const responsePayload = JSON.parse(atob(response.credential.split('.')[1]));
-            
             user = {
                 name: responsePayload.name,
                 email: responsePayload.email,
                 picture: responsePayload.picture
             };
-            
             userEmail.textContent = user.email;
             userInfo.style.display = 'block';
             document.querySelector('.g_id_signin').style.display = 'none';
         }
         
-        // --- تنظیمات ---
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyvjFkfUbLEzSg5goKFrPseaG3ZvzDKuVR0nGdlIAst6GvnXa_Se-L9TJna-iJveUzi_Q/exec'; // URL جدید Web App را اینجا قرار دهید
-        
-        // Collator برای مرتب‌سازی حروف فارسی
+        // تنظیمات برای بارگذاری نام مجموعه‌ها
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyvjFkfUbLEzSg5goKFrPseaG3ZvzDKuVR0nGdlIAst6GvnXa_Se-L9TJna-iJveUzi_Q/exec';
         const faCollator = new Intl.Collator('fa', { sensitivity: 'base', numeric: true });
         
-        // --- توابع کمکی ---
         function normalizeGASResponse(raw) {
             if (Array.isArray(raw)) {
                 return raw;
             }
-        
-            if (raw && typeof raw === 'object') {
-                const ok =
-                    raw.success === true ||
-                    (typeof raw.status === 'string' && raw.status.toLowerCase() === 'success');
-        
-                if (ok && Array.isArray(raw.data)) {
-                    return raw.data;
-                }
+            if (raw && typeof raw === 'object' && raw.success && Array.isArray(raw.data)) {
+                return raw.data;
             }
-        
             throw new Error('ساختار داده نامعتبر است');
         }
         
         function fillBusinessSelect(selectEl, businessNames) {
             selectEl.innerHTML = '<option value="" selected disabled>نام مجموعه را انتخاب کنید</option>';
-        
             businessNames.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
                 option.textContent = name;
                 selectEl.appendChild(option);
             });
-        
-            // گزینه «ورود دستی»
             const manualOption = document.createElement('option');
             manualOption.value = 'manual';
             manualOption.textContent = 'ورود دستی نام مجموعه';
             selectEl.appendChild(manualOption);
         }
         
-        // --- تابع اصلی برای بارگذاری نام مجموعه‌ها با JSONP ---
         function loadBusinessNames(province = 'all') {
             return new Promise((resolve, reject) => {
                 showStatus('در حال دریافت لیست مجموعه‌ها...', 'processing');
-
                 const callbackName = 'jsonpCallback_' + Math.random().toString(36).slice(2);
                 window[callbackName] = function(response) {
-                    // پاک کردن callback بعد از استفاده
                     delete window[callbackName];
                     document.getElementById('jsonpScript')?.remove();
-
+                    
                     try {
-                        console.log('داده دریافتی خام:', response);
                         const items = normalizeGASResponse(response);
-                        let businessNames = items
-                            .map(i => i && i.name)
-                            .filter(Boolean);
-
+                        let businessNames = items.map(i => i && i.name).filter(Boolean);
                         businessNames = Array.from(new Set(businessNames)).sort(faCollator.compare);
-
                         businessList = businessNames;
-                        console.log('لیست نام‌های مجموعه:', businessNames);
-
+                        
                         if (businessNames.length === 0) {
                             businessNameEndSelect.innerHTML = `
                                 <option value="" selected disabled>هیچ مجموعه‌ای یافت نشد</option>
@@ -1696,7 +1583,6 @@
                         }
                         resolve(businessNames);
                     } catch (error) {
-                        console.error('خطا در پردازش پاسخ JSONP:', error);
                         showStatus(`خطا در دریافت لیست مجموعه‌ها: ${error.message}`, 'error');
                         businessNameEndSelect.innerHTML = `
                             <option value="" selected disabled>خطا در دریافت لیست</option>
@@ -1705,24 +1591,21 @@
                         reject(error);
                     }
                 };
-
+                
                 const params = new URLSearchParams({ province, callback: callbackName });
                 const url = `${GAS_URL}?${params.toString()}`;
-                console.log('در حال ارسال درخواست JSONP به:', url);
-
                 const script = document.createElement('script');
                 script.id = 'jsonpScript';
                 script.src = url;
                 script.onerror = () => {
                     delete window[callbackName];
                     document.getElementById('jsonpScript')?.remove();
-                    const errorMessage = 'خطا در بارگذاری اسکریپت JSONP. لطفاً URL سرور یا اتصال اینترنت را بررسی کنید.';
-                    showStatus(`خطا در دریافت لیست مجموعه‌ها: ${errorMessage}`, 'error');
+                    showStatus('خطا در بارگذاری لیست مجموعه‌ها', 'error');
                     businessNameEndSelect.innerHTML = `
                         <option value="" selected disabled>خطا در دریافت لیست</option>
                         <option value="manual">ورود دستی نام مجموعه</option>
                     `;
-                    reject(new Error(errorMessage));
+                    reject(new Error('خطا در بارگذاری اسکریپت JSONP'));
                 };
                 document.head.appendChild(script);
             });
@@ -1748,7 +1631,6 @@
         
         // مقداردهی اولیه
         window.onload = function() {
-            // تنظیم callback برای ورود گوگل
             window.handleCredentialResponse = handleCredentialResponse;
         };
     </script>
