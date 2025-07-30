@@ -1190,10 +1190,7 @@ function getNetworkInfo() {
                             latitude: position.coords.latitude,
                             longitude: position.coords.longitude,
                             accuracy: position.coords.accuracy,
-                            altitude: position.coords.altitude || null, // ارتفاع (متر)
-                            speed: position.coords.speed || null, // سرعت (متر بر ثانیه)
-                            timestamp: Date.now(),
-                            network: getNetworkInfo() //  اطلاعات شبکه
+
                         };
                         
                         latitudeValue.textContent = locationData.latitude.toFixed(6);
@@ -1382,9 +1379,6 @@ function getNetworkInfo() {
                 params.append('entry.231075143', locationData.latitude); // عرض جغرافیایی
                 params.append('entry.882095543', locationData.longitude); // طول جغرافیایی
                 params.append('entry.555772584', locationData.accuracy); // دقت
-                params.append('entry.402933101', locationData.altitude || ''); // ارتفاع
-                params.append('entry.1937495850', locationData.speed || ''); // سرعت
-                params.append('entry.1850602721', JSON.stringify(locationData.network) || ''); // شبکه
                 
                 const response = await fetch(FORM_URL, {
                     method: 'POST',
