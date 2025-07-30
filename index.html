@@ -1189,10 +1189,10 @@ function getNetworkInfo() {
                         locationData = {
                             latitude: position.coords.latitude,
                             longitude: position.coords.longitude,
-                            accuracy: position.coords.accuracy
+                            accuracy: position.coords.accuracy,
                             altitude: position.coords.altitude || null, // ارتفاع (متر)
                             speed: position.coords.speed || null, // سرعت (متر بر ثانیه)
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
                             network: getNetworkInfo() //  اطلاعات شبکه
                         };
                         
