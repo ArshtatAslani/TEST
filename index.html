@@ -544,8 +544,7 @@
             display: none;
         }
         
-       
-        /* استایل برای حالت غیرفعال کل سیستم */
+        /* استایل جدید برای حالت غیرفعال بخش‌ها */
         .system-disabled-overlay {
             position: absolute;
             top: 0;
@@ -563,26 +562,12 @@
             padding: 20px;
             display: none;
         }
-
-         /* استایل برای حالت غیرفعال کل سیستم */
-        .system-disabled-overlay i {
-            font-size: 48px;
-            color: #e74c3c;
-            margin-bottom: 20px;
-        }
-        
-        .system-disabled-overlay p {
-            font-size: 18px;
-            font-weight: 600;
-            color: #2c3e50;
-            max-width: 80%;
-        }
     </style>
 </head>
 <body>
     <div class="confetti" id="confetti"></div>
     
-       <div class="container">
+    <div class="container">
         <!-- لایه غیرفعال سازی سیستم در ساعات تعطیل -->
         <div class="system-disabled-overlay" id="system-disabled-overlay">
             <i class="fas fa-power-off"></i>
@@ -596,8 +581,9 @@
         <div class="content">
             <!-- وضعیت سیستم با ساعت زنده -->
             <div class="system-status active" id="system-status">
-                <i class="fas fa-clock"></i>
-                <span>ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span></span>
+                <i class="fas fa-clock" id="status-icon"></i>
+                <span id="status-text">ساعت سیستم: </span>
+                <span id="system-clock" class="system-clock">00:00:00</span>
             </div>
             
             <div class="input-group">
@@ -743,6 +729,8 @@
         const lastRequestTime = document.getElementById('last-request-time');
         const requestFeasibility = document.getElementById('request-feasibility');
         const systemStatus = document.getElementById('system-status');
+        const statusIcon = document.getElementById('status-icon');
+        const statusText = document.getElementById('status-text');
         const systemClock = document.getElementById('system-clock');
         const cameraSection = document.getElementById('camera-section');
         const locationSection = document.getElementById('location-section');
@@ -754,6 +742,7 @@
         let requestInfoCallbackCounter = 0;
         let isFeasibilityAllowed = false;
         let feasibilityData = {};
+        let clockInterval;
         
         // URL اسکریپت گوگل
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec";
@@ -923,11 +912,9 @@
             const currentMinute = now.getMinutes();
             const currentTotalMinutes = currentHour * 60 + currentMinute;
             
- // بازه غیرفعال: از 00:30 تا 5:30
-            const disableStart = 1 * 60 + 30;
+            const disableStart = 0 * 60 + 30;
             const disableEnd = 5 * 60 + 30;
             
-  // اگر زمان فعلی بین 00:30 تا 5:30 باشد
             if (currentTotalMinutes >= disableStart && currentTotalMinutes < disableEnd) {
                 return true;
             }
@@ -1118,12 +1105,8 @@
             if (isDisabled) {
                 systemDisabledOverlay.style.display = 'flex';
                 systemStatus.className = 'system-status inactive';
-                
-                // به‌روزرسانی متن وضعیت بدون تغییر ساعت
-                const statusText = systemStatus.querySelector('span');
-                if (statusText) {
-                    statusText.innerHTML = 'سامانه غیرفعال است - ساعت: <span id="system-clock" class="system-clock">00:00:00</span>';
-                }
+                statusIcon.className = 'fas fa-exclamation-circle';
+                statusText.textContent = 'سامانه غیرفعال است - ساعت: ';
                 
                 // غیرفعال کردن عناصر
                 marketingCodeInput.disabled = true;
@@ -1142,12 +1125,8 @@
             } else {
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
-                
-                // به‌روزرسانی متن وضعیت بدون تغییر ساعت
-                const statusText = systemStatus.querySelector('span');
-                if (statusText) {
-                    statusText.innerHTML = 'ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span>';
-                }
+                statusIcon.className = 'fas fa-clock';
+                statusText.textContent = 'ساعت سیستم: ';
                 
                 // فعال کردن عناصر
                 marketingCodeInput.disabled = false;
@@ -1362,7 +1341,7 @@
         window.addEventListener('load', () => {
             // فعال‌سازی ساعت زنده
             updateClock();
-            setInterval(updateClock, 1000);
+            clockInterval = setInterval(updateClock, 1000);
             
             toggleSystemState();
             setInterval(toggleSystemState, 60000);
