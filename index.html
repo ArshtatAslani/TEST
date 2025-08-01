@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سامانه حضور و غیاب | دوربین و موقعیت‌یابی</title>
+    <title>سامانه حضور و غیاب | نسخه پیشرفته</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -346,7 +346,6 @@
             z-index: 10;
         }
         
-        /* استایل جدید برای کادر توسعه‌دهنده تک خطی و مرکزی */
         .dev-credit {
             text-align: center;
             direction: ltr;
@@ -364,25 +363,12 @@
             letter-spacing: 0.5px;
         }
 
-        /* برای نمایش بهتر در موبایل */
         @media (max-width: 480px) {
             .dev-credit {
                 font-size: 11px;
                 padding: 5px 8px;
                 margin-top: 10px;
             }
-        }
-        
-        .dev-credit span {
-            display: inline-block;
-            margin-left: 5px;
-            animation: sparkle 1.5s infinite;
-        }
-        
-        @keyframes sparkle {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
         }
         
         @media (max-width: 480px) {
@@ -404,7 +390,6 @@
             }
         }
         
-        /* استایل برای نمایش محدوده زمانی ثبت حضور */
         .time-restriction-info {
             background-color: #fff9db;
             border-left: 4px solid #f59f00;
@@ -420,21 +405,6 @@
             animation: fadeIn 0.5s;
         }
         
-        .time-restriction-info i {
-            margin-left: 5px;
-            color: #f59f00;
-        }
-        
-        .time-restriction-info ul {
-            margin: 10px 0 0 20px;
-            list-style-type: disc;
-        }
-        
-        .time-restriction-info li {
-            margin-bottom: 5px;
-        }
-        
-        /* استایل برای حالت غیرفعال کل سیستم */
         .system-disabled-overlay {
             position: absolute;
             top: 0;
@@ -451,19 +421,6 @@
             text-align: center;
             padding: 20px;
             display: none;
-        }
-        
-        .system-disabled-overlay i {
-            font-size: 48px;
-            color: #e74c3c;
-            margin-bottom: 20px;
-        }
-        
-        .system-disabled-overlay p {
-            font-size: 18px;
-            font-weight: 600;
-            color: #2c3e50;
-            max-width: 80%;
         }
         
         /* استایل جدید برای فیلدهای زمان آخرین درخواست و امکان سنجی */
@@ -539,13 +496,35 @@
             0%, 100% { opacity: 0; transform: scale(0.7); }
             50% { opacity: 1; transform: scale(1); }
         }
+        
+        .system-status {
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .system-status.active {
+            background: #e8f5e9;
+            border-color: #c8e6c9;
+        }
+        
+        .system-status.inactive {
+            background: #ffebee;
+            border-color: #ffcdd2;
+        }
     </style>
 </head>
 <body>
     <div class="confetti" id="confetti"></div>
     
     <div class="container">
-        <!-- لایه غیرفعال سازی سیستم در ساعات تعطیل -->
         <div class="system-disabled-overlay" id="system-disabled-overlay">
             <i class="fas fa-power-off"></i>
             <p>سامانه از ساعت 00:30 تا 5:30 صبح غیرفعال می‌باشد.</p>
@@ -557,6 +536,12 @@
         </div>
         
         <div class="content">
+            <!-- وضعیت سیستم -->
+            <div class="system-status active" id="system-status">
+                <i class="fas fa-check-circle"></i>
+                <span>سامانه در حال حاضر فعال است</span>
+            </div>
+            
             <div class="input-group">
                 <label for="marketing-code"><i class="fas fa-barcode"></i> کد بازاریابی</label>
                 <i class="fas fa-tag"></i>
@@ -697,11 +682,16 @@
         const requestInfoContainer = document.getElementById('request-info-container');
         const lastRequestTime = document.getElementById('last-request-time');
         const requestFeasibility = document.getElementById('request-feasibility');
+        const systemStatus = document.getElementById('system-status');
         
         // متغیرهای وضعیت
         let stream = null;
         let locationData = null;
-        let currentCameraMode = "environment"; // حالت پیش‌فرض دوربین عقب
+        let currentCameraMode = "environment";
+        let requestInfoCallbackCounter = 0;
+        
+        // URL اسکریپت گوگل
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSiCMRQN15akya880AMUYrUHtRmpN32nDM_yowIiJnIdJaRyArWgLCfY45ICUtSvI4/exec";
         
         // بازه‌های زمانی مجاز برای ثبت حضور
         const allowedTimeSlots = [
@@ -719,7 +709,6 @@
         // فعال‌سازی دوربین
         async function startCamera() {
             try {
-                // تنظیمات برای استفاده از دوربین
                 const constraints = {
                     video: {
                         facingMode: currentCameraMode,
@@ -741,7 +730,6 @@
                 startCameraBtn.disabled = true;
                 startCameraBtn.innerHTML = '<i class="fas fa-check"></i> دوربین فعال شد';
                 
-                // تنظیم عنوان دوربین
                 const cameraType = currentCameraMode === "environment" ? "عقب" : "جلو";
                 document.querySelector('.camera-placeholder p').textContent = `دوربین ${cameraType} فعال است`;
                 
@@ -812,18 +800,13 @@
             const now = new Date();
             const currentHour = now.getHours();
             const currentMinute = now.getMinutes();
-            const currentSecond = now.getSeconds();
-            
-            // تبدیل زمان فعلی به دقیقه برای مقایسه آسان
             const currentTotalMinutes = currentHour * 60 + currentMinute;
             
             for (const slot of allowedTimeSlots) {
                 const startTotalMinutes = slot.start.hour * 60 + slot.start.minute;
                 const endTotalMinutes = slot.end.hour * 60 + slot.end.minute;
                 
-                // برای نیمه شب (بازه 00:00 تا 00:30)
                 if (slot.start.hour === 0) {
-                    // اگر ساعت فعلی بین 0 تا 0:30 باشد
                     if (currentHour === 0 && currentMinute >= 0 && currentMinute <= 30) {
                         return true;
                     }
@@ -842,14 +825,11 @@
             const now = new Date();
             const currentHour = now.getHours();
             const currentMinute = now.getMinutes();
-            const currentSeconds = now.getSeconds();
             const currentTotalMinutes = currentHour * 60 + currentMinute;
             
-            // بازه غیرفعال: از 00:30 تا 5:30
-            const disableStart = 0 * 60 + 30; // 00:30 (30 دقیقه)
-            const disableEnd = 5 * 60 + 30;   // 5:30 (330 دقیقه)
+            const disableStart = 0 * 60 + 30;
+            const disableEnd = 5 * 60 + 30;
             
-            // اگر زمان فعلی بین 00:30 تا 5:30 باشد
             if (currentTotalMinutes >= disableStart && currentTotalMinutes < disableEnd) {
                 return true;
             }
@@ -858,7 +838,6 @@
         
         // اعتبارسنجی کد بازاریابی (5 رقمی بودن)
         function validateMarketingCode(code) {
-            // کد باید دقیقاً 5 رقم باشد
             const regex = /^\d{5}$/;
             return regex.test(code);
         }
@@ -886,8 +865,9 @@
             
             if (isDisabled) {
                 systemDisabledOverlay.style.display = 'flex';
+                systemStatus.className = 'system-status inactive';
+                systemStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> سامانه در حال حاضر غیرفعال است';
                 
-                // غیرفعال کردن تمام دکمه‌ها و عناصر ورودی
                 marketingCodeInput.disabled = true;
                 requestTypeSelect.disabled = true;
                 startCameraBtn.disabled = true;
@@ -896,7 +876,6 @@
                 submitBtn.disabled = true;
                 rotateCameraBtn.disabled = true;
                 
-                // توقف دوربین اگر فعال باشد
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     cameraFeed.style.display = 'none';
@@ -904,8 +883,9 @@
                 }
             } else {
                 systemDisabledOverlay.style.display = 'none';
+                systemStatus.className = 'system-status active';
+                systemStatus.innerHTML = '<i class="fas fa-check-circle"></i> سامانه در حال حاضر فعال است';
                 
-                // فعال کردن دوباره عناصر
                 marketingCodeInput.disabled = false;
                 requestTypeSelect.disabled = false;
                 startCameraBtn.disabled = false;
@@ -914,14 +894,12 @@
                 submitBtn.disabled = false;
                 rotateCameraBtn.disabled = false;
                 
-                // به‌روزرسانی وضعیت دکمه‌ها
                 updateButtonStates();
             }
         }
         
         // تابع برای به‌روزرسانی وضعیت دکمه‌ها
         function updateButtonStates() {
-            // وضعیت دکمه شروع دوربین
             if (stream) {
                 startCameraBtn.disabled = true;
                 captureBtn.disabled = false;
@@ -930,14 +908,12 @@
                 captureBtn.disabled = true;
             }
             
-            // وضعیت دکمه ارسال
             if (marketingCodeInput.value.trim() !== '' && locationData) {
                 submitBtn.disabled = false;
             } else {
                 submitBtn.disabled = true;
             }
             
-            // وضعیت دکمه دریافت موقعیت
             if (locationData) {
                 getLocationBtn.disabled = true;
             } else {
@@ -945,7 +921,7 @@
             }
         }
         
-        // تابع برای فراخوانی اطلاعات با JSONP
+        // تابع برای فراخوانی اطلاعات با JSONP از Google Apps Script
         function fetchRequestInfo() {
             const marketingCode = marketingCodeInput.value.trim();
             const requestType = requestTypeSelect.value;
@@ -962,49 +938,68 @@
             requestFeasibility.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
             
             // ایجاد یک تابع callback منحصر به فرد
-            const callbackName = 'jsonpCallback_' + Date.now();
+            const callbackName = 'jsonpCallback_' + (requestInfoCallbackCounter++);
             
             // ساخت URL با پارامترهای مورد نیاز
-            const url = `https://script.google.com/macros/s/AKfycbwSiCMRQN15akya880AMUYrUHtRmpN32nDM_yowIiJnIdJaRyArWgLCfY45ICUtSvI4/exec?marketingCode=${marketingCode}&requestType=${encodeURIComponent(requestType)}&callback=${callbackName}`;
+            const url = `${GOOGLE_SCRIPT_URL}?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
             
             // تعریف تابع callback
             window[callbackName] = function(data) {
                 // حذف تابع callback بعد از اجرا
                 delete window[callbackName];
                 
-                // به‌روزرسانی فیلدها با داده‌های دریافتی
-                lastRequestTime.textContent = data.lastRequestTime || 'اطلاعاتی موجود نیست';
-                if (data.feasibility === 'مجاز') {
-                    requestFeasibility.textContent = 'مجاز';
-                    requestFeasibility.classList.add('feasibility-allowed');
-                    requestFeasibility.classList.remove('feasibility-denied');
-                } else {
-                    requestFeasibility.textContent = 'غیرمجاز';
-                    requestFeasibility.classList.add('feasibility-denied');
-                    requestFeasibility.classList.remove('feasibility-allowed');
-                }
-                
                 // حذف اسکریپت
-                document.getElementById('jsonp-script').remove();
+                document.getElementById('jsonp-script-' + callbackName)?.remove();
+                
+                if (data.success) {
+                    if (data.exists) {
+                        // نمایش زمان آخرین درخواست
+                        const requestDate = new Date(data.lastRecord.timestamp);
+                        const formattedTime = requestDate.toLocaleTimeString('fa-IR', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        lastRequestTime.textContent = formattedTime;
+                        
+                        // نمایش امکان سنجی درخواست مجدد
+                        if (data.lastRecord.status) {
+                            requestFeasibility.textContent = 'مجاز';
+                            requestFeasibility.classList.add('feasibility-allowed');
+                            requestFeasibility.classList.remove('feasibility-denied');
+                        } else {
+                            requestFeasibility.textContent = 'غیرمجاز';
+                            requestFeasibility.classList.add('feasibility-denied');
+                            requestFeasibility.classList.remove('feasibility-allowed');
+                        }
+                    } else {
+                        lastRequestTime.textContent = 'اطلاعاتی موجود نیست';
+                        requestFeasibility.textContent = 'اطلاعاتی موجود نیست';
+                    }
+                } else {
+                    lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
+                    requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
+                    console.error('خطا در دریافت اطلاعات:', data.error);
+                }
             };
             
             // ایجاد اسکریپت برای درخواست JSONP
             const script = document.createElement('script');
-            script.id = 'jsonp-script';
+            script.id = 'jsonp-script-' + callbackName;
             script.src = url;
             
             // مدیریت خطا
             script.onerror = function() {
-                lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
-                requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
+                lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
+                requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 delete window[callbackName];
+                document.getElementById('jsonp-script-' + callbackName)?.remove();
             };
             
             // افزودن اسکریپت به صفحه
             document.body.appendChild(script);
         }
         
-        // ثبت حضور و ارسال به گوگل فرم با استفاده از Fetch API
+        // ثبت حضور و ارسال به گوگل فرم
         submitBtn.addEventListener('click', async () => {
             const marketingCode = marketingCodeInput.value.trim();
             const requestType = requestTypeSelect.value;
@@ -1028,9 +1023,6 @@
             
             // اعتبارسنجی زمان ثبت حضور
             if (requestType === 'ثبت حضور' && !isWithinAllowedTime()) {
-                const now = new Date();
-                const currentTime = now.toLocaleTimeString('fa-IR');
-                
                 showStatus(`ثبت حضور فقط در بازه‌های زمانی مشخص امکان‌پذیر است.`, 'error');
                 return;
             }
@@ -1044,11 +1036,11 @@
                 
                 // ساخت پارامترهای ارسالی
                 const params = new URLSearchParams();
-                params.append('entry.1228562108', marketingCode); // کد بازاریابی
-                params.append('entry.2093256559', locationData.latitude); // عرض جغرافیایی
-                params.append('entry.1314182104', locationData.longitude); // طول جغرافیایی
-                params.append('entry.1995166577', locationData.accuracy); // دقت
-                params.append('entry.1723693542', requestType); // نوع درخواست
+                params.append('entry.1228562108', marketingCode);
+                params.append('entry.2093256559', locationData.latitude);
+                params.append('entry.1314182104', locationData.longitude);
+                params.append('entry.1995166577', locationData.accuracy);
+                params.append('entry.1723693542', requestType);
                 
                 // ارسال درخواست POST
                 await fetch(formUrl, {
@@ -1129,13 +1121,11 @@
         
         // انیمیشن موفقیت
         function showSuccessAnimation() {
-            // انیمیشن دکمه
             submitBtn.classList.add('success-animation');
             setTimeout(() => {
                 submitBtn.classList.remove('success-animation');
             }, 2000);
             
-            // ایجاد کنفتی
             createConfetti();
         }
         
@@ -1179,7 +1169,6 @@
         // اجرای تابع toggleSystemState در هنگام لود و هر دقیقه
         window.addEventListener('load', () => {
             toggleSystemState();
-            // بررسی هر دقیقه
             setInterval(toggleSystemState, 60000);
             
             // شبیه‌سازی داده‌های اولیه
