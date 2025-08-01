@@ -553,7 +553,8 @@
                 <label for="request-type"><i class="fas fa-tasks"></i> نوع درخواست</label>
                 <i class="fas fa-list-alt"></i>
                 <select id="request-type">
-                    <option value="شروع شیفت">شروع شیفت</option>
+                    <option value="" disabled selected>نوع درخواست را انتخاب نمایید</option>
+                    <option value="شروع شیفت" selected>شروع شیفت</option>
                     <option value="پایان شیفت">پایان شیفت</option>
                     <option value="ثبت حضور">ثبت حضور</option>
                 </select>
@@ -849,8 +850,8 @@
                 timeRestrictionInfo.classList.remove('show');
             }
             
-            // نمایش فیلدهای جدید در صورت انتخاب نوع درخواست
-            if (this.value) {
+            // نمایش فیلدهای جدید فقط برای پایان شیفت و ثبت حضور
+            if (this.value === 'پایان شیفت' || this.value === 'ثبت حضور') {
                 requestInfoContainer.style.display = 'grid';
                 fetchRequestInfo();
             } else {
@@ -1113,7 +1114,7 @@
             }
             
             // در صورت تغییر کد بازاریابی، اطلاعات را مجدداً دریافت کنید
-            if (requestTypeSelect.value) {
+            if (requestInfoContainer.style.display === 'grid') {
                 fetchRequestInfo();
             }
         });
