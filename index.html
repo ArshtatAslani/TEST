@@ -545,21 +545,21 @@
             <div class="input-group">
                 <label for="marketing-code"><i class="fas fa-barcode"></i> کد بازاریابی</label>
                 <i class="fas fa-tag"></i>
-                <input type="text" id="marketing-code" placeholder="کد 5 رقمی خود را وارد نمایید...">
+                <input type="text" id="marketing-code" maxlength="5" placeholder="کد 5 رقمی خود را وارد نمایید...">
             </div>
             
             <!-- کشویی نوع درخواست -->
             <div class="input-group">
-        <label for="request-type"><i class="fas fa-tasks"></i> نوع درخواست</label>
-        <i class="fas fa-list-alt"></i>
-        <select id="request-type" required>
-            <option value="" disabled selected hidden>نوع درخواست را انتخاب نمایید</option>
-            <option value="شروع شیفت">شروع شیفت</option>
-            <option value="پایان شیفت">پایان شیفت</option>
-            <option value="ثبت حضور">ثبت حضور</option>
-        </select>
-        <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
-    </div>
+                <label for="request-type"><i class="fas fa-tasks"></i> نوع درخواست</label>
+                <i class="fas fa-list-alt"></i>
+                <select id="request-type" required>
+                    <option value="" disabled selected hidden>نوع درخواست را انتخاب نمایید</option>
+                    <option value="شروع شیفت">شروع شیفت</option>
+                    <option value="پایان شیفت">پایان شیفت</option>
+                    <option value="ثبت حضور">ثبت حضور</option>
+                </select>
+                <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+            </div>
             
             <!-- فیلدهای جدید: ساعت آخرین درخواست و امکان سنجی درخواست مجدد -->
             <div id="request-info-container" class="request-info-container" style="display: none;">
@@ -842,8 +842,7 @@
             return regex.test(code);
         }
         
-        // نمایش اطلاعات محدودیت زمانی برای ثبت حضور
-       // تغییرات در اسکریپت برای مدیریت انتخاب نوع درخواست
+        // تغییرات در اسکریپت برای مدیریت انتخاب نوع درخواست
         requestTypeSelect.addEventListener('change', function() {
             // نمایش محدودیت زمانی فقط برای ثبت حضور
             if (this.value === 'ثبت حضور') {
@@ -852,8 +851,8 @@
                 timeRestrictionInfo.classList.remove('show');
             }
             
-            // نمایش فیلدهای اطلاعات فقط برای پایان شیفت و ثبت حضور
-            if (this.value === 'پایان شیفت' || this.value === 'ثبت حضور') {
+            // نمایش فیلدهای اطلاعات برای همه انواع درخواست به جز حالت اولیه
+            if (this.value !== '') {
                 requestInfoContainer.style.display = 'grid';
                 if (validateMarketingCode(marketingCodeInput.value.trim())) {
                     fetchRequestInfo();
@@ -1122,13 +1121,16 @@
         }
         
         // اعتبارسنجی فرم
-        marketingCodeInput.addEventListener('input', () => {
-            if (marketingCodeInput.value.trim() !== '' && locationData) {
+        marketingCodeInput.addEventListener('input', function() {
+            // محدود کردن ورودی به حداکثر 5 رقم
+            this.value = this.value.replace(/\D/g, '').slice(0, 5);
+            
+            if (this.value.trim() !== '' && locationData) {
                 submitBtn.disabled = false;
             } else {
                 submitBtn.disabled = true;
             }
-            
+
             // در صورت تغییر کد بازاریابی، اطلاعات را مجدداً دریافت کنید
             if (requestInfoContainer.style.display === 'grid') {
                 fetchRequestInfo();
