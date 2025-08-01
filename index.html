@@ -461,7 +461,12 @@
             padding: 5px;
             border-radius: 8px;
             background: #e6f7ff;
-        }
+        /* اضافه کردن این خطوط برای وسط چین کردن محتوا */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 40px; /* ارتفاع مناسب برای نمایش عمودی وسط */
+    }
         
         .feasibility-allowed {
             color: #28a745;
@@ -1056,10 +1061,14 @@
                             requestFeasibility.classList.remove('feasibility-allowed');
                             isFeasibilityAllowed = false;
                         }
-                    } else {
-                        lastRequestTime.textContent = 'مجاز';
-                        requestFeasibility.textContent = 'مجاز';
-                        isFeasibilityAllowed = true;
+                        } else {
+                            lastRequestTime.textContent = 'اطلاعاتی موجود نیست';
+    
+                          // تغییر این سه خط
+                            requestFeasibility.textContent = 'مجاز';
+                            requestFeasibility.classList.add('feasibility-allowed');
+                            requestFeasibility.classList.remove('feasibility-denied');
+                            isFeasibilityAllowed = true;
                         
                         // فعال کردن بخش‌ها
                         toggleSections(true);
