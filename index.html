@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سامانه حضور و غیاب | نسخه پیشرفته</title>
+    <title>سامانه حضور و غیاب</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -519,6 +519,14 @@
             background: #ffebee;
             border-color: #ffcdd2;
         }
+
+        /* استایل جدید برای خطای کد بازاریابی */
+        .marketing-code-error {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -532,20 +540,20 @@
         
         <div class="header">
             <h1><i class="fas fa-camera"></i> سامانه حضور و غیاب</h1>
-            <p>نسخه پیشرفته با قابلیت‌های جدید</p>
         </div>
         
         <div class="content">
             <!-- وضعیت سیستم -->
             <div class="system-status active" id="system-status">
                 <i class="fas fa-check-circle"></i>
-                <span>سامانه در حال حاضر فعال است</span>
+                <span id="system-clock"></span>
             </div>
             
             <div class="input-group">
                 <label for="marketing-code"><i class="fas fa-barcode"></i> کد بازاریابی</label>
                 <i class="fas fa-tag"></i>
                 <input type="text" id="marketing-code" maxlength="5" placeholder="کد 5 رقمی خود را وارد نمایید...">
+                <div id="marketing-code-error" class="marketing-code-error"></div>
             </div>
             
             <!-- کشویی نوع درخواست -->
@@ -665,6 +673,7 @@
     <script>
         // عناصر DOM
         const marketingCodeInput = document.getElementById('marketing-code');
+        const marketingCodeError = document.getElementById('marketing-code-error');
         const requestTypeSelect = document.getElementById('request-type');
         const startCameraBtn = document.getElementById('start-camera');
         const captureBtn = document.getElementById('capture-btn');
@@ -683,12 +692,14 @@
         const lastRequestTime = document.getElementById('last-request-time');
         const requestFeasibility = document.getElementById('request-feasibility');
         const systemStatus = document.getElementById('system-status');
+        const systemClock = document.getElementById('system-clock');
         
         // متغیرهای وضعیت
         let stream = null;
         let locationData = null;
         let currentCameraMode = "environment";
         let requestInfoCallbackCounter = 0;
+        let isFeasibilityAllowed = true;
         
         // URL اسکریپت گوگل
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec";
@@ -705,6 +716,17 @@
             { start: { hour: 20, minute: 0 }, end: { hour: 20, minute: 30 } },
             { start: { hour: 22, minute: 0 }, end: { hour: 22, minute: 30 } }
         ];
+        
+        // فعال‌سازی ساعت زنده
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('fa-IR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            systemClock.textContent = timeString;
+        }
         
         // فعال‌سازی دوربین
         async function startCamera() {
@@ -774,9 +796,7 @@
                         getLocationBtn.innerHTML = '<i class="fas fa-check"></i> موقعیت دریافت شد';
                         
                         // فعال کردن دکمه ارسال
-                        if (marketingCodeInput.value.trim() !== '') {
-                            submitBtn.disabled = false;
-                        }
+                        validateForm();
                     },
                     error => {
                         showStatus(`خطا در دریافت موقعیت: ${error.message}`, 'error');
@@ -867,11 +887,30 @@
 
         // تابع اعتبارسنجی فرم
         function validateForm() {
-            const isValid = validateMarketingCode(marketingCodeInput.value.trim()) && 
-                          locationData && 
-                          requestTypeSelect.value !== '';
+            const marketingCode = marketingCodeInput.value.trim();
+            const isValidCode = validateMarketingCode(marketingCode);
+            const hasLocation = !!locationData;
+            const hasRequestType = requestTypeSelect.value !== '';
             
+            // اعتبارسنجی کد بازاریابی
+            if (marketingCode !== '') {
+                if (!isValidCode) {
+                    marketingCodeError.textContent = 'کد بازاریابی باید دقیقاً 5 رقم باشد';
+                    marketingCodeError.style.display = 'block';
+                } else {
+                    marketingCodeError.style.display = 'none';
+                }
+            } else {
+                marketingCodeError.style.display = 'none';
+            }
+            
+            // بررسی امکان سنجی درخواست مجدد
+            const isFeasible = isFeasibilityAllowed;
+            
+            const isValid = isValidCode && hasLocation && hasRequestType && isFeasible;
             submitBtn.disabled = !isValid;
+            
+            return isValid;
         }
         
         // تابع برای غیرفعال کردن کل سیستم در ساعات تعطیل
@@ -899,7 +938,9 @@
             } else {
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
-                systemStatus.innerHTML = '<i class="fas fa-check-circle"></i> سامانه در حال حاضر فعال است';
+                systemStatus.innerHTML = '<i class="fas fa-check-circle"></i> <span id="system-clock"></span>';
+                systemClock = document.getElementById('system-clock');
+                updateClock();
                 
                 marketingCodeInput.disabled = false;
                 requestTypeSelect.disabled = false;
@@ -923,11 +964,7 @@
                 captureBtn.disabled = true;
             }
             
-            if (marketingCodeInput.value.trim() !== '' && locationData) {
-                submitBtn.disabled = false;
-            } else {
-                submitBtn.disabled = true;
-            }
+            validateForm();
             
             if (locationData) {
                 getLocationBtn.disabled = true;
@@ -981,20 +1018,27 @@
                             requestFeasibility.textContent = 'مجاز';
                             requestFeasibility.classList.add('feasibility-allowed');
                             requestFeasibility.classList.remove('feasibility-denied');
+                            isFeasibilityAllowed = true;
                         } else {
                             requestFeasibility.textContent = 'غیرمجاز';
                             requestFeasibility.classList.add('feasibility-denied');
                             requestFeasibility.classList.remove('feasibility-allowed');
+                            isFeasibilityAllowed = false;
                         }
                     } else {
                         lastRequestTime.textContent = 'اطلاعاتی موجود نیست';
                         requestFeasibility.textContent = 'اطلاعاتی موجود نیست';
+                        isFeasibilityAllowed = true;
                     }
                 } else {
                     lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
                     requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
+                    isFeasibilityAllowed = true;
                     console.error('خطا در دریافت اطلاعات:', data.error);
                 }
+                
+                // اعتبارسنجی مجدد فرم پس از دریافت اطلاعات
+                validateForm();
             };
             
             // ایجاد اسکریپت برای درخواست JSONP
@@ -1006,8 +1050,10 @@
             script.onerror = function() {
                 lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
+                isFeasibilityAllowed = true;
                 delete window[callbackName];
                 document.getElementById('jsonp-script-' + callbackName)?.remove();
+                validateForm();
             };
             
             // افزودن اسکریپت به صفحه
@@ -1039,6 +1085,12 @@
             // اعتبارسنجی زمان ثبت حضور
             if (requestType === 'ثبت حضور' && !isWithinAllowedTime()) {
                 showStatus(`ثبت حضور فقط در بازه‌های زمانی مشخص امکان‌پذیر است.`, 'error');
+                return;
+            }
+            
+            // بررسی امکان سنجی درخواست مجدد
+            if (!isFeasibilityAllowed) {
+                showStatus('درخواست مجدد در این زمان مجاز نمی‌باشد', 'error');
                 return;
             }
             
@@ -1100,6 +1152,7 @@
                     requestInfoContainer.style.display = 'none';
                     lastRequestTime.innerHTML = '';
                     requestFeasibility.innerHTML = '';
+                    isFeasibilityAllowed = true;
                 }, 2000);
                 
             } catch (error) {
@@ -1125,11 +1178,7 @@
             // محدود کردن ورودی به حداکثر 5 رقم
             this.value = this.value.replace(/\D/g, '').slice(0, 5);
             
-            if (this.value.trim() !== '' && locationData) {
-                submitBtn.disabled = false;
-            } else {
-                submitBtn.disabled = true;
-            }
+            validateForm();
 
             // در صورت تغییر کد بازاریابی، اطلاعات را مجدداً دریافت کنید
             if (requestInfoContainer.style.display === 'grid') {
@@ -1186,6 +1235,10 @@
         
         // اجرای تابع toggleSystemState در هنگام لود و هر دقیقه
         window.addEventListener('load', () => {
+            // فعال‌سازی ساعت زنده
+            setInterval(updateClock, 1000);
+            updateClock();
+            
             toggleSystemState();
             setInterval(toggleSystemState, 60000);
         });
