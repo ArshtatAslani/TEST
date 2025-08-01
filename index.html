@@ -1049,13 +1049,13 @@
                 // ساخت URL برای ارسال به گوگل فرم
                 const formUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdY70VGHakFIzh9zjWbfZ2T-tBqUg3xtNEZwG4drNpjnbwrjg/formResponse';
                 
-                // ساخت پارامترهای ارسالی
+                // ساخت پارامترهای ارسالی با استفاده از نام‌های جدید ستون‌ها
                 const params = new URLSearchParams();
-                params.append('entry.1228562108', marketingCode);
-                params.append('entry.2093256559', locationData.latitude);
-                params.append('entry.1314182104', locationData.longitude);
-                params.append('entry.1995166577', locationData.accuracy);
-                params.append('entry.1723693542', requestType);
+                params.append('entry.1228562108', marketingCode);        // کد بازاریابی
+                params.append('entry.2093256559', locationData.latitude); // عرض جغرافیایی
+                params.append('entry.1314182104', locationData.longitude); // طول جغرافیایی
+                params.append('entry.1995166577', locationData.accuracy);  // دقت موقعیت
+                params.append('entry.1723693542', requestType);           // نوع درخواست
                 
                 // ارسال درخواست POST
                 await fetch(formUrl, {
