@@ -1088,10 +1088,12 @@
             if (isDisabled) {
                 systemDisabledOverlay.style.display = 'flex';
                 systemStatus.className = 'system-status inactive';
-                systemStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> سامانه غیرفعال است - ساعت: <span id="system-clock" class="system-clock">00:00:00</span>';
                 
-                // به‌روزرسانی ارجاع به ساعت سیستم
-                systemClock = document.getElementById('system-clock');
+                // به‌روزرسانی متن وضعیت بدون تغییر ساعت
+                const statusText = systemStatus.querySelector('span');
+                if (statusText) {
+                    statusText.innerHTML = 'سامانه غیرفعال است - ساعت: <span id="system-clock" class="system-clock">00:00:00</span>';
+                }
                 
                 // غیرفعال کردن عناصر
                 marketingCodeInput.disabled = true;
@@ -1110,11 +1112,12 @@
             } else {
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
-                systemStatus.innerHTML = '<i class="fas fa-clock"></i> ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span>';
                 
-                // به‌روزرسانی ارجاع به ساعت سیستم
-                systemClock = document.getElementById('system-clock');
-                updateClock();
+                // به‌روزرسانی متن وضعیت بدون تغییر ساعت
+                const statusText = systemStatus.querySelector('span');
+                if (statusText) {
+                    statusText.innerHTML = 'ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span>';
+                }
                 
                 // فعال کردن عناصر
                 marketingCodeInput.disabled = false;
