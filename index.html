@@ -544,20 +544,48 @@
             display: none;
         }
         
-        /* استایل جدید برای حالت غیرفعال بخش‌ها */
-        .section-disabled {
-            opacity: 0.5;
-            pointer-events: none;
+       
+        /* استایل برای حالت غیرفعال کل سیستم */
+        .system-disabled-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.85);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border-radius: 20px;
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+         /* استایل برای حالت غیرفعال کل سیستم */
+        .system-disabled-overlay i {
+            font-size: 48px;
+            color: #e74c3c;
+            margin-bottom: 20px;
+        }
+        
+        .system-disabled-overlay p {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            max-width: 80%;
         }
     </style>
 </head>
 <body>
     <div class="confetti" id="confetti"></div>
     
-    <div class="container">
+       <div class="container">
+        <!-- لایه غیرفعال سازی سیستم در ساعات تعطیل -->
         <div class="system-disabled-overlay" id="system-disabled-overlay">
-            <i class="fas fa-power-off" style="font-size: 48px; margin-bottom: 20px;"></i>
-            <h3>سامانه در حال حاضر غیرفعال است</h3>
+            <i class="fas fa-power-off"></i>
             <p>سامانه از ساعت 00:30 تا 5:30 صبح غیرفعال می‌باشد.</p>
         </div>
         
@@ -895,9 +923,11 @@
             const currentMinute = now.getMinutes();
             const currentTotalMinutes = currentHour * 60 + currentMinute;
             
+ // بازه غیرفعال: از 00:30 تا 5:30
             const disableStart = 0 * 60 + 30;
             const disableEnd = 5 * 60 + 30;
             
+  // اگر زمان فعلی بین 00:30 تا 5:30 باشد
             if (currentTotalMinutes >= disableStart && currentTotalMinutes < disableEnd) {
                 return true;
             }
