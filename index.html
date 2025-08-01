@@ -940,7 +940,7 @@
             const callbackName = 'jsonpCallback_' + (requestInfoCallbackCounter++);
             
             // ساخت URL با پارامترهای مورد نیاز
-            const url = `$https://script.google.com/macros/s/AKfycbwSiCMRQN15akya880AMUYrUHtRmpN32nDM_yowIiJnIdJaRyArWgLCfY45ICUtSvI4/exec?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
+            const url = "https://script.google.com/macros/s/AKfycbwSiCMRQN15akya880AMUYrUHtRmpN32nDM_yowIiJnIdJaRyArWgLCfY45ICUtSvI4/exec"?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
             
             // تعریف تابع callback
             window[callbackName] = function(data) {
