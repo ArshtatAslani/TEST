@@ -750,7 +750,11 @@
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const timeString = `${hours}:${minutes}:${seconds}`;
-            systemClock.textContent = timeString;
+            
+            // به‌روزرسانی ساعت سیستم
+            if (systemClock) {
+                systemClock.textContent = timeString;
+            }
         }
         
         // تابع برای فعال/غیرفعال کردن بخش‌های دوربین و موقعیت جغرافیایی
@@ -1084,8 +1088,12 @@
             if (isDisabled) {
                 systemDisabledOverlay.style.display = 'flex';
                 systemStatus.className = 'system-status inactive';
-                systemStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> سامانه در حال حاضر غیرفعال است';
+                systemStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> سامانه غیرفعال است - ساعت: <span id="system-clock" class="system-clock">00:00:00</span>';
                 
+                // به‌روزرسانی ارجاع به ساعت سیستم
+                systemClock = document.getElementById('system-clock');
+                
+                // غیرفعال کردن عناصر
                 marketingCodeInput.disabled = true;
                 requestTypeSelect.disabled = true;
                 startCameraBtn.disabled = true;
@@ -1103,14 +1111,18 @@
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
                 systemStatus.innerHTML = '<i class="fas fa-clock"></i> ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span>';
+                
+                // به‌روزرسانی ارجاع به ساعت سیستم
+                systemClock = document.getElementById('system-clock');
                 updateClock();
                 
+                // فعال کردن عناصر
                 marketingCodeInput.disabled = false;
                 requestTypeSelect.disabled = false;
                 startCameraBtn.disabled = false;
-                captureBtn.disabled = true;
+                captureBtn.disabled = true; // تا دوربین فعال نشده، غیرفعال است
                 getLocationBtn.disabled = false;
-                submitBtn.disabled = true;
+                submitBtn.disabled = true; // تا زمانی که فرم کامل نشده، غیرفعال است
                 rotateCameraBtn.disabled = false;
                 
                 updateButtonStates();
