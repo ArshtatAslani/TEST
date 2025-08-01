@@ -525,6 +525,16 @@
             background: #ffebee;
             border-color: #ffcdd2;
         }
+        
+        .system-clock {
+            color: #ff0000;
+            font-family: Arial;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+        }
 
         /* استایل جدید برای خطای کد بازاریابی */
         .marketing-code-error {
@@ -556,10 +566,10 @@
         </div>
         
         <div class="content">
-            <!-- وضعیت سیستم -->
+            <!-- وضعیت سیستم با ساعت زنده -->
             <div class="system-status active" id="system-status">
                 <i class="fas fa-clock"></i>
-                <span id="system-clock" style="color: #ff0000; font-family: Arial; font-size: 18px;"></span>
+                <span>ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span></span>
             </div>
             
             <div class="input-group">
@@ -622,7 +632,7 @@
                 </ul>
             </div>
             
-            <div id="camera-section" class="camera-section section-disabled">
+            <div id="camera-section" class="camera-section">
                 <div class="camera-container">
                     <div class="camera-placeholder">
                         <i class="fas fa-camera"></i>
@@ -635,7 +645,7 @@
                 </div>
                 
                 <div class="camera-controls">
-                    <button id="start-camera" class="btn btn-primary" disabled>
+                    <button id="start-camera" class="btn btn-primary">
                         <i class="fas fa-video"></i> فعال‌سازی دوربین
                     </button>
                     <button id="capture-btn" class="btn btn-secondary" disabled>
@@ -644,7 +654,7 @@
                 </div>
             </div>
             
-            <div id="location-section" class="location-section section-disabled">
+            <div id="location-section" class="location-section">
                 <div class="location-header">
                     <h3><i class="fas fa-map-marker-alt"></i> موقعیت جغرافیایی</h3>
                 </div>
@@ -664,7 +674,7 @@
                 </div>
                 
                 <!-- دکمه دریافت موقعیت جغرافیایی -->
-                <button id="get-location-btn" class="btn btn-tertiary" disabled>
+                <button id="get-location-btn" class="btn btn-tertiary">
                     <i class="fas fa-location-arrow"></i> دریافت موقعیت جغرافیایی
                 </button>
             </div>
@@ -1092,20 +1102,15 @@
             } else {
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
-                systemStatus.innerHTML = '<i class="fas fa-clock"></i> <span id="system-clock" style="color: #ff0000; font-family: Arial; font-size: 18px;"></span>';
-                systemClock.textContent = new Date().toLocaleTimeString('fa-IR', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                }).replace(/:/g, ':');
+                systemStatus.innerHTML = '<i class="fas fa-clock"></i> ساعت سیستم: <span id="system-clock" class="system-clock">00:00:00</span>';
+                updateClock();
                 
                 marketingCodeInput.disabled = false;
                 requestTypeSelect.disabled = false;
                 startCameraBtn.disabled = false;
-                captureBtn.disabled = false;
+                captureBtn.disabled = true;
                 getLocationBtn.disabled = false;
-                submitBtn.disabled = false;
+                submitBtn.disabled = true;
                 rotateCameraBtn.disabled = false;
                 
                 updateButtonStates();
@@ -1311,8 +1316,8 @@
         // اجرای تابع toggleSystemState در هنگام لود و هر دقیقه
         window.addEventListener('load', () => {
             // فعال‌سازی ساعت زنده
+            updateClock();
             setInterval(updateClock, 1000);
-            updateClock(); // فراخوانی اولیه برای نمایش ساعت
             
             toggleSystemState();
             setInterval(toggleSystemState, 60000);
