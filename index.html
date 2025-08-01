@@ -527,6 +527,12 @@
             margin-top: 5px;
             display: none;
         }
+        
+        /* استایل جدید برای حالت غیرفعال بخش‌ها */
+        .section-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -534,7 +540,8 @@
     
     <div class="container">
         <div class="system-disabled-overlay" id="system-disabled-overlay">
-            <i class="fas fa-power-off"></i>
+            <i class="fas fa-power-off" style="font-size: 48px; margin-bottom: 20px;"></i>
+            <h3>سامانه در حال حاضر غیرفعال است</h3>
             <p>سامانه از ساعت 00:30 تا 5:30 صبح غیرفعال می‌باشد.</p>
         </div>
         
@@ -545,7 +552,7 @@
         <div class="content">
             <!-- وضعیت سیستم -->
             <div class="system-status active" id="system-status">
-                <i class="fas fa-check-circle"></i>
+                <i class="fas fa-clock"></i>
                 <span id="system-clock"></span>
             </div>
             
@@ -609,7 +616,7 @@
                 </ul>
             </div>
             
-            <div class="camera-section">
+            <div id="camera-section" class="camera-section section-disabled">
                 <div class="camera-container">
                     <div class="camera-placeholder">
                         <i class="fas fa-camera"></i>
@@ -622,7 +629,7 @@
                 </div>
                 
                 <div class="camera-controls">
-                    <button id="start-camera" class="btn btn-primary">
+                    <button id="start-camera" class="btn btn-primary" disabled>
                         <i class="fas fa-video"></i> فعال‌سازی دوربین
                     </button>
                     <button id="capture-btn" class="btn btn-secondary" disabled>
@@ -631,7 +638,7 @@
                 </div>
             </div>
             
-            <div class="location-section">
+            <div id="location-section" class="location-section section-disabled">
                 <div class="location-header">
                     <h3><i class="fas fa-map-marker-alt"></i> موقعیت جغرافیایی</h3>
                 </div>
@@ -651,7 +658,7 @@
                 </div>
                 
                 <!-- دکمه دریافت موقعیت جغرافیایی -->
-                <button id="get-location-btn" class="btn btn-tertiary">
+                <button id="get-location-btn" class="btn btn-tertiary" disabled>
                     <i class="fas fa-location-arrow"></i> دریافت موقعیت جغرافیایی
                 </button>
             </div>
@@ -693,13 +700,15 @@
         const requestFeasibility = document.getElementById('request-feasibility');
         const systemStatus = document.getElementById('system-status');
         const systemClock = document.getElementById('system-clock');
+        const cameraSection = document.getElementById('camera-section');
+        const locationSection = document.getElementById('location-section');
         
         // متغیرهای وضعیت
         let stream = null;
         let locationData = null;
         let currentCameraMode = "environment";
         let requestInfoCallbackCounter = 0;
-        let isFeasibilityAllowed = true;
+        let isFeasibilityAllowed = false; // حالت اولیه: غیرمجاز
         
         // URL اسکریپت گوگل
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec";
@@ -938,7 +947,7 @@
             } else {
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
-                systemStatus.innerHTML = '<i class="fas fa-check-circle"></i> <span id="system-clock"></span>';
+                systemStatus.innerHTML = '<i class="fas fa-clock"></i> <span id="system-clock"></span>';
                 systemClock = document.getElementById('system-clock');
                 updateClock();
                 
@@ -951,6 +960,22 @@
                 rotateCameraBtn.disabled = false;
                 
                 updateButtonStates();
+            }
+        }
+        
+        // تابع برای فعال/غیرفعال کردن بخش‌های دوربین و موقعیت جغرافیایی
+        function toggleSections(enable) {
+            if (enable) {
+                cameraSection.classList.remove('section-disabled');
+                locationSection.classList.remove('section-disabled');
+                startCameraBtn.disabled = false;
+                getLocationBtn.disabled = false;
+            } else {
+                cameraSection.classList.add('section-disabled');
+                locationSection.classList.add('section-disabled');
+                startCameraBtn.disabled = true;
+                captureBtn.disabled = true;
+                getLocationBtn.disabled = true;
             }
         }
         
@@ -989,6 +1014,9 @@
             lastRequestTime.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
             requestFeasibility.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
             
+            // غیرفعال کردن بخش‌ها تا مشخص شدن نتیجه
+            toggleSections(false);
+            
             // ایجاد یک تابع callback منحصر به فرد
             const callbackName = 'jsonpCallback_' + (requestInfoCallbackCounter++);
             
@@ -1019,6 +1047,9 @@
                             requestFeasibility.classList.add('feasibility-allowed');
                             requestFeasibility.classList.remove('feasibility-denied');
                             isFeasibilityAllowed = true;
+                            
+                            // فعال کردن بخش‌ها فقط اگر امکان‌سنجی مجاز باشد
+                            toggleSections(true);
                         } else {
                             requestFeasibility.textContent = 'غیرمجاز';
                             requestFeasibility.classList.add('feasibility-denied');
@@ -1029,11 +1060,14 @@
                         lastRequestTime.textContent = 'اطلاعاتی موجود نیست';
                         requestFeasibility.textContent = 'اطلاعاتی موجود نیست';
                         isFeasibilityAllowed = true;
+                        
+                        // فعال کردن بخش‌ها
+                        toggleSections(true);
                     }
                 } else {
                     lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
                     requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
-                    isFeasibilityAllowed = true;
+                    isFeasibilityAllowed = false;
                     console.error('خطا در دریافت اطلاعات:', data.error);
                 }
                 
@@ -1050,7 +1084,7 @@
             script.onerror = function() {
                 lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
-                isFeasibilityAllowed = true;
+                isFeasibilityAllowed = false;
                 delete window[callbackName];
                 document.getElementById('jsonp-script-' + callbackName)?.remove();
                 validateForm();
@@ -1152,7 +1186,10 @@
                     requestInfoContainer.style.display = 'none';
                     lastRequestTime.innerHTML = '';
                     requestFeasibility.innerHTML = '';
-                    isFeasibilityAllowed = true;
+                    isFeasibilityAllowed = false;
+                    
+                    // غیرفعال کردن بخش‌ها پس از ارسال موفق
+                    toggleSections(false);
                 }, 2000);
                 
             } catch (error) {
