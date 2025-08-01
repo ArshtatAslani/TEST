@@ -429,7 +429,7 @@
             grid-template-columns: 1fr 1fr;
             gap: 15px;
             margin-bottom: 20px;
-            animation: slideDown 0.5s ease-out;
+            animation: slideDown 0.3s ease-out; /* سرعت لودینگ بالاتر */
         }
         
         @keyframes slideDown {
@@ -461,12 +461,11 @@
             padding: 5px;
             border-radius: 8px;
             background: #e6f7ff;
-        /* اضافه کردن این خطوط برای وسط چین کردن محتوا */
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 40px; /* ارتفاع مناسب برای نمایش عمودی وسط */
-    }
+            min-height: 40px;
+        }
         
         .feasibility-allowed {
             color: #28a745;
@@ -490,7 +489,7 @@
             background: #1a2980;
             margin: 0 2px;
             opacity: 0;
-            animation: loading-dots 1.5s infinite;
+            animation: loading-dots 1.0s infinite; /* سرعت لودینگ بالاتر */
         }
         
         .loading-dots span:nth-child(1) { animation-delay: 0s; }
@@ -713,7 +712,8 @@
         let locationData = null;
         let currentCameraMode = "environment";
         let requestInfoCallbackCounter = 0;
-        let isFeasibilityAllowed = false; // حالت اولیه: غیرمجاز
+        let isFeasibilityAllowed = false;
+        let feasibilityData = {};
         
         // URL اسکریپت گوگل
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec";
@@ -739,7 +739,7 @@
                 minute: '2-digit',
                 second: '2-digit'
             });
-            systemClock.textContent = timeString;
+            systemClock.textContent = timeString; // نمایش ساعت در زمان واقعی
         }
         
         // فعال‌سازی دوربین
@@ -809,6 +809,9 @@
                         showStatus('موقعیت جغرافیایی دریافت شد', 'success');
                         getLocationBtn.innerHTML = '<i class="fas fa-check"></i> موقعیت دریافت شد';
                         
+                        // به‌روزرسانی امکان‌سنجی پس از دریافت موقعیت
+                        updateFeasibility();
+                        
                         // فعال کردن دکمه ارسال
                         validateForm();
                     },
@@ -876,6 +879,25 @@
             return regex.test(code);
         }
         
+        // به‌روزرسانی امکان‌سنجی
+        function updateFeasibility() {
+            const marketingCode = marketingCodeInput.value.trim();
+            const requestType = requestTypeSelect.value;
+            
+            if (!validateMarketingCode(marketingCode) || !requestType) {
+                return;
+            }
+            
+            // فرض می‌کنیم feasibilityData حاوی اطلاعات امکان‌سنجی است
+            isFeasibilityAllowed = feasibilityData[requestType]?.status || false;
+            
+            requestFeasibility.textContent = isFeasibilityAllowed ? 'مجاز' : 'غیرمجاز';
+            requestFeasibility.classList.toggle('feasibility-allowed', isFeasibilityAllowed);
+            requestFeasibility.classList.toggle('feasibility-denied', !isFeasibilityAllowed);
+            
+            validateForm();
+        }
+        
         // تغییرات در اسکریپت برای مدیریت انتخاب نوع درخواست
         requestTypeSelect.addEventListener('change', function() {
             // نمایش محدودیت زمانی فقط برای ثبت حضور
@@ -894,6 +916,9 @@
             } else {
                 requestInfoContainer.style.display = 'none';
             }
+            
+            // به‌روزرسانی امکان‌سنجی
+            updateFeasibility();
             
             // اعتبارسنجی فرم
             validateForm();
@@ -953,8 +978,11 @@
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
                 systemStatus.innerHTML = '<i class="fas fa-clock"></i> <span id="system-clock"></span>';
-                systemClock = document.getElementById('system-clock');
-                updateClock();
+                systemClock.textContent = new Date().toLocaleTimeString('fa-IR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
                 
                 marketingCodeInput.disabled = false;
                 requestTypeSelect.disabled = false;
@@ -1046,29 +1074,24 @@
                         });
                         lastRequestTime.textContent = formattedTime;
                         
+                        // ذخیره اطلاعات امکان‌سنجی
+                        feasibilityData[requestType] = { status: data.lastRecord.status };
+                        isFeasibilityAllowed = data.lastRecord.status;
+                        
                         // نمایش امکان سنجی درخواست مجدد
-                        if (data.lastRecord.status) {
-                            requestFeasibility.textContent = 'مجاز';
-                            requestFeasibility.classList.add('feasibility-allowed');
-                            requestFeasibility.classList.remove('feasibility-denied');
-                            isFeasibilityAllowed = true;
-                            
-                            // فعال کردن بخش‌ها فقط اگر امکان‌سنجی مجاز باشد
-                            toggleSections(true);
-                        } else {
-                            requestFeasibility.textContent = 'غیرمجاز';
-                            requestFeasibility.classList.add('feasibility-denied');
-                            requestFeasibility.classList.remove('feasibility-allowed');
-                            isFeasibilityAllowed = false;
-                        }
-                        } else {
-                            lastRequestTime.textContent = 'اطلاعاتی موجود نیست';
-    
-                          // تغییر این سه خط
-                            requestFeasibility.textContent = 'مجاز';
-                            requestFeasibility.classList.add('feasibility-allowed');
-                            requestFeasibility.classList.remove('feasibility-denied');
-                            isFeasibilityAllowed = true;
+                        requestFeasibility.textContent = isFeasibilityAllowed ? 'مجاز' : 'غیرمجاز';
+                        requestFeasibility.classList.toggle('feasibility-allowed', isFeasibilityAllowed);
+                        requestFeasibility.classList.toggle('feasibility-denied', !isFeasibilityAllowed);
+                        
+                        // فعال کردن بخش‌ها فقط اگر امکان‌سنجی مجاز باشد
+                        toggleSections(isFeasibilityAllowed);
+                    } else {
+                        lastRequestTime.textContent = 'اطلاعاتی موجود نیست';
+                        requestFeasibility.textContent = 'مجاز';
+                        requestFeasibility.classList.add('feasibility-allowed');
+                        requestFeasibility.classList.remove('feasibility-denied');
+                        isFeasibilityAllowed = true;
+                        feasibilityData[requestType] = { status: true };
                         
                         // فعال کردن بخش‌ها
                         toggleSections(true);
@@ -1077,6 +1100,7 @@
                     lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
                     requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در دریافت اطلاعات</span>';
                     isFeasibilityAllowed = false;
+                    feasibilityData[requestType] = { status: false };
                     console.error('خطا در دریافت اطلاعات:', data.error);
                 }
                 
@@ -1094,6 +1118,7 @@
                 lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 isFeasibilityAllowed = false;
+                feasibilityData[requestType] = { status: false };
                 delete window[callbackName];
                 document.getElementById('jsonp-script-' + callbackName)?.remove();
                 validateForm();
@@ -1196,6 +1221,7 @@
                     lastRequestTime.innerHTML = '';
                     requestFeasibility.innerHTML = '';
                     isFeasibilityAllowed = false;
+                    feasibilityData = {};
                     
                     // غیرفعال کردن بخش‌ها پس از ارسال موفق
                     toggleSections(false);
@@ -1283,7 +1309,7 @@
         window.addEventListener('load', () => {
             // فعال‌سازی ساعت زنده
             setInterval(updateClock, 1000);
-            updateClock();
+            updateClock(); // فراخوانی اولیه برای نمایش ساعت
             
             toggleSystemState();
             setInterval(toggleSystemState, 60000);
