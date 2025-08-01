@@ -429,7 +429,7 @@
             grid-template-columns: 1fr 1fr;
             gap: 15px;
             margin-bottom: 20px;
-            animation: slideDown 0.3s ease-out; /* سرعت لودینگ بالاتر */
+            animation: slideDown 0.3s ease-out;
         }
         
         @keyframes slideDown {
@@ -489,7 +489,7 @@
             background: #1a2980;
             margin: 0 2px;
             opacity: 0;
-            animation: loading-dots 1.0s infinite; /* سرعت لودینگ بالاتر */
+            animation: loading-dots 1.0s infinite;
         }
         
         .loading-dots span:nth-child(1) { animation-delay: 0s; }
@@ -557,7 +557,7 @@
             <!-- وضعیت سیستم -->
             <div class="system-status active" id="system-status">
                 <i class="fas fa-clock"></i>
-                <span id="system-clock"></span>
+                <span id="system-clock" style="color: #ff0000; font-family: Arial; font-size: 18px;">HH:MM:SS</span>
             </div>
             
             <div class="input-group">
@@ -735,11 +735,12 @@
         function updateClock() {
             const now = new Date();
             const timeString = now.toLocaleTimeString('fa-IR', {
+                hour12: false,
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
-            });
-            systemClock.textContent = timeString; // نمایش ساعت در زمان واقعی
+            }).replace(/:/g, ':'); // فرمت 24 ساعته HH:MM:SS
+            systemClock.textContent = timeString;
         }
         
         // فعال‌سازی دوربین
@@ -977,12 +978,13 @@
             } else {
                 systemDisabledOverlay.style.display = 'none';
                 systemStatus.className = 'system-status active';
-                systemStatus.innerHTML = '<i class="fas fa-clock"></i> <span id="system-clock"></span>';
+                systemStatus.innerHTML = '<i class="fas fa-clock"></i> <span id="system-clock" style="color: #ff0000; font-family: Arial; font-size: 18px;">HH:MM:SS</span>';
                 systemClock.textContent = new Date().toLocaleTimeString('fa-IR', {
+                    hour12: false,
                     hour: '2-digit',
                     minute: '2-digit',
                     second: '2-digit'
-                });
+                }).replace(/:/g, ':');
                 
                 marketingCodeInput.disabled = false;
                 requestTypeSelect.disabled = false;
@@ -1069,6 +1071,7 @@
                         // نمایش زمان آخرین درخواست
                         const requestDate = new Date(data.lastRecord.timestamp);
                         const formattedTime = requestDate.toLocaleTimeString('fa-IR', {
+                            hour12: false,
                             hour: '2-digit',
                             minute: '2-digit'
                         });
