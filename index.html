@@ -553,7 +553,6 @@
                 <label for="request-type"><i class="fas fa-tasks"></i> نوع درخواست</label>
                 <i class="fas fa-list-alt"></i>
                 <select id="request-type">
-                    <option value="">-- لطفا انتخاب کنید --</option>
                     <option value="شروع شیفت">شروع شیفت</option>
                     <option value="پایان شیفت">پایان شیفت</option>
                     <option value="ثبت حضور">ثبت حضور</option>
@@ -941,7 +940,7 @@
             const callbackName = 'jsonpCallback_' + (requestInfoCallbackCounter++);
             
             // ساخت URL با پارامترهای مورد نیاز
-            const url = `${https://script.google.com/macros/s/AKfycbwSiCMRQN15akya880AMUYrUHtRmpN32nDM_yowIiJnIdJaRyArWgLCfY45ICUtSvI4/exec}?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
+            const url = `$https://script.google.com/macros/s/AKfycbwSiCMRQN15akya880AMUYrUHtRmpN32nDM_yowIiJnIdJaRyArWgLCfY45ICUtSvI4/exec?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
             
             // تعریف تابع callback
             window[callbackName] = function(data) {
@@ -1170,16 +1169,6 @@
         window.addEventListener('load', () => {
             toggleSystemState();
             setInterval(toggleSystemState, 60000);
-            
-            // شبیه‌سازی داده‌های اولیه
-            marketingCodeInput.value = '12345';
-            requestTypeSelect.value = 'شروع شیفت';
-            setTimeout(() => {
-                requestInfoContainer.style.display = 'grid';
-                lastRequestTime.textContent = '۱۴:۳۰';
-                requestFeasibility.textContent = 'مجاز';
-                requestFeasibility.classList.add('feasibility-allowed');
-            }, 1000);
         });
     </script>
 </body>
