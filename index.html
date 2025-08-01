@@ -550,16 +550,16 @@
             
             <!-- کشویی نوع درخواست -->
             <div class="input-group">
-                <label for="request-type"><i class="fas fa-tasks"></i> نوع درخواست</label>
-                <i class="fas fa-list-alt"></i>
-                <select id="request-type">
-                    <option value="" disabled selected>نوع درخواست را انتخاب نمایید</option>
-                    <option value="شروع شیفت" selected>شروع شیفت</option>
-                    <option value="پایان شیفت">پایان شیفت</option>
-                    <option value="ثبت حضور">ثبت حضور</option>
-                </select>
-                <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
-            </div>
+        <label for="request-type"><i class="fas fa-tasks"></i> نوع درخواست</label>
+        <i class="fas fa-list-alt"></i>
+        <select id="request-type" required>
+            <option value="" disabled selected hidden>نوع درخواست را انتخاب نمایید</option>
+            <option value="شروع شیفت">شروع شیفت</option>
+            <option value="پایان شیفت">پایان شیفت</option>
+            <option value="ثبت حضور">ثبت حضور</option>
+        </select>
+        <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+    </div>
             
             <!-- فیلدهای جدید: ساعت آخرین درخواست و امکان سنجی درخواست مجدد -->
             <div id="request-info-container" class="request-info-container" style="display: none;">
@@ -843,21 +843,37 @@
         }
         
         // نمایش اطلاعات محدودیت زمانی برای ثبت حضور
+       // تغییرات در اسکریپت برای مدیریت انتخاب نوع درخواست
         requestTypeSelect.addEventListener('change', function() {
+            // نمایش محدودیت زمانی فقط برای ثبت حضور
             if (this.value === 'ثبت حضور') {
                 timeRestrictionInfo.classList.add('show');
             } else {
                 timeRestrictionInfo.classList.remove('show');
             }
             
-            // نمایش فیلدهای جدید فقط برای پایان شیفت و ثبت حضور
+            // نمایش فیلدهای اطلاعات فقط برای پایان شیفت و ثبت حضور
             if (this.value === 'پایان شیفت' || this.value === 'ثبت حضور') {
                 requestInfoContainer.style.display = 'grid';
-                fetchRequestInfo();
+                if (validateMarketingCode(marketingCodeInput.value.trim())) {
+                    fetchRequestInfo();
+                }
             } else {
                 requestInfoContainer.style.display = 'none';
             }
+            
+            // اعتبارسنجی فرم
+            validateForm();
         });
+
+        // تابع اعتبارسنجی فرم
+        function validateForm() {
+            const isValid = validateMarketingCode(marketingCodeInput.value.trim()) && 
+                          locationData && 
+                          requestTypeSelect.value !== '';
+            
+            submitBtn.disabled = !isValid;
+        }
         
         // تابع برای غیرفعال کردن کل سیستم در ساعات تعطیل
         function toggleSystemState() {
