@@ -578,11 +578,65 @@
             font-weight: 600;
             color: #2c3e50;
         }
+        
+        /* استایل جدید برای وضعیت پیش‌بارگذاری */
+        .global-preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            display: none;
+        }
+        
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #1a2980;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-state {
+            opacity: 0.6;
+            pointer-events: none;
+            position: relative;
+        }
+        
+        .loading-state::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.5);
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
     <!-- کانتینر کنفتی برای انیمیشن موفقیت -->
     <div class="confetti" id="confetti"></div>
+    
+    <!-- Global Preloader -->
+    <div class="global-preloader" id="global-preloader">
+        <div class="spinner"></div>
+        <p>در حال بارگذاری اطلاعات ...</p>
+    </div>
     
     <!-- کانتینر اصلی -->
     <div class="container">
@@ -757,6 +811,7 @@
         const locationSection = document.getElementById('location-section');
         const cameraOverlay = document.getElementById('camera-overlay');
         const locationOverlay = document.getElementById('location-overlay');
+        const globalPreloader = document.getElementById('global-preloader');
         
         // متغیرهای وضعیت
         let stream = null;
@@ -769,8 +824,13 @@
         let selectedRequestType = null;
         let isFetchingFeasibility = false;
         
-        // URL گوگل اسکریپت برای بررسی امکان‌سنجی
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec";
+        // تعریف چندین نقطه انتهایی برای مدیریت ترافیک
+        const ENDPOINTS = [
+            "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec",
+            "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec?alt=1",
+            "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec?alt=2"
+        ];
+        let currentEndpointIndex = 0;
         
         // بازه‌های زمانی مجاز برای ثبت حضور
         const allowedTimeSlots = [
@@ -810,92 +870,124 @@
             }
         }
         
-        // تابع فعال‌سازی دوربین
+        // فعال‌سازی همزمان دوربین و موقعیت‌یابی
+        function initializeResources() {
+            return Promise.all([
+                new Promise(resolve => {
+                    if (!stream) {
+                        startCamera().then(resolve).catch(e => resolve());
+                    } else {
+                        resolve();
+                    }
+                }),
+                new Promise(resolve => {
+                    if (!locationData) {
+                        getLocation().then(resolve).catch(e => resolve());
+                    } else {
+                        resolve();
+                    }
+                })
+            ]);
+        }
+        
+        // تابع فعال‌سازی دوربین با Promise
         async function startCamera() {
-            try {
-                const constraints = {
-                    video: {
-                        facingMode: currentCameraMode,
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                };
-                
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const constraints = {
+                        video: {
+                            facingMode: currentCameraMode,
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    };
+                    
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    cameraFeed.srcObject = stream;
+                    cameraFeed.style.display = 'block';
+                    document.querySelector('.camera-placeholder').style.display = 'none';
+                    captureBtn.disabled = false;
+                    startCameraBtn.disabled = true;
+                    startCameraBtn.innerHTML = '<i class="fas fa-check"></i> دوربین فعال شد';
+                    
+                    const cameraType = currentCameraMode === "environment" ? "عقب" : "جلو";
+                    document.querySelector('.camera-placeholder p').textContent = `دوربین ${cameraType} فعال است`;
+                    resolve();
+                    
+                } catch (err) {
+                    showStatus(`خطا در دسترسی به دوربین: ${err.message}`, 'error');
+                    console.error('خطای دوربین:', err);
+                    reject(err);
                 }
-                
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                cameraFeed.srcObject = stream;
-                cameraFeed.style.display = 'block';
-                document.querySelector('.camera-placeholder').style.display = 'none';
-                captureBtn.disabled = false;
-                startCameraBtn.disabled = true;
-                startCameraBtn.innerHTML = '<i class="fas fa-check"></i> دوربین فعال شد';
-                
-                const cameraType = currentCameraMode === "environment" ? "عقب" : "جلو";
-                document.querySelector('.camera-placeholder p').textContent = `دوربین ${cameraType} فعال است`;
-                
-            } catch (err) {
-                showStatus(`خطا در دسترسی به دوربین: ${err.message}`, 'error');
-                console.error('خطای دوربین:', err);
-            }
+            });
         }
         
         // رویداد کلیک برای دکمه شروع دوربین
-        startCameraBtn.addEventListener('click', startCamera);
+        startCameraBtn.addEventListener('click', () => {
+            startCamera().catch(console.error);
+        });
         
         // رویداد کلیک برای چرخش دوربین
         rotateCameraBtn.addEventListener('click', () => {
             currentCameraMode = currentCameraMode === "environment" ? "user" : "environment";
-            startCamera();
+            startCamera().catch(console.error);
         });
+        
+        // تابع دریافت موقعیت جغرافیایی با Promise
+        function getLocation() {
+            return new Promise((resolve, reject) => {
+                showStatus('در حال دریافت موقعیت جغرافیایی...', 'processing');
+                getLocationBtn.disabled = true;
+                
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        position => {
+                            locationData = {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            };
+                            
+                            latitudeValue.textContent = locationData.latitude.toFixed(6);
+                            longitudeValue.textContent = locationData.longitude.toFixed(6);
+                            accuracyValue.textContent = `${Math.round(locationData.accuracy)} متر`;
+                            
+                            showStatus('موقعیت جغرافیایی دریافت شد', 'success');
+                            getLocationBtn.innerHTML = '<i class="fas fa-check"></i> موقعیت دریافت شد';
+                            
+                            updateFeasibility();
+                            validateForm();
+                            resolve();
+                        },
+                        error => {
+                            showStatus(`خطا در دریافت موقعیت: ${error.message}`, 'error');
+                            console.error('خطای موقعیت‌یابی:', error);
+                            getLocationBtn.disabled = false;
+                            reject(error);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        }
+                    );
+                } else {
+                    showStatus('مرورگر شما از موقعیت‌یابی جغرافیایی پشتیبانی نمی‌کند', 'error');
+                    getLocationBtn.disabled = false;
+                    reject(new Error('Geolocation not supported'));
+                }
+            });
+        }
         
         // رویداد کلیک برای دریافت موقعیت
         getLocationBtn.addEventListener('click', () => {
-            showStatus('در حال دریافت موقعیت جغرافیایی...', 'processing');
-            getLocationBtn.disabled = true;
-            getLocation();
+            getLocation().catch(console.error);
         });
-        
-        // تابع دریافت موقعیت جغرافیایی
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    position => {
-                        locationData = {
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude,
-                            accuracy: position.coords.accuracy
-                        };
-                        
-                        latitudeValue.textContent = locationData.latitude.toFixed(6);
-                        longitudeValue.textContent = locationData.longitude.toFixed(6);
-                        accuracyValue.textContent = `${Math.round(locationData.accuracy)} متر`;
-                        
-                        showStatus('موقعیت جغرافیایی دریافت شد', 'success');
-                        getLocationBtn.innerHTML = '<i class="fas fa-check"></i> موقعیت دریافت شد';
-                        
-                        updateFeasibility();
-                        validateForm();
-                    },
-                    error => {
-                        showStatus(`خطا در دریافت موقعیت: ${error.message}`, 'error');
-                        console.error('خطای موقعیت‌یابی:', error);
-                        getLocationBtn.disabled = false;
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            } else {
-                showStatus('مرورگر شما از موقعیت‌یابی جغرافیایی پشتیبانی نمی‌کند', 'error');
-                getLocationBtn.disabled = false;
-            }
-        }
         
         // تابع بررسی محدودیت زمانی ثبت حضور
         function isWithinAllowedTime() {
@@ -963,7 +1055,7 @@
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
                 const { timestamp, data } = JSON.parse(cached);
-                if (Date.now() - timestamp < 60000) { // کش برای 60 ثانیه معتبر است
+                if (Date.now() - timestamp < 300000) { // کش برای 5 دقیقه معتبر است
                     return data;
                 }
             }
@@ -1007,12 +1099,15 @@
             
             isFetchingFeasibility = true;
             toggleSections(false);
+            showGlobalPreloader(true);
             
             lastRequestTime.innerHTML = '<div class="loading-indicator">در حال بارگذاری...</div>';
             requestFeasibility.innerHTML = '<div class="loading-indicator">در حال بررسی...</div>';
             
+            // الگوی Circuit Breaker برای مدیریت خطاها
             const callbackName = 'jsonpCallback_' + (requestInfoCallbackCounter++);
-            const url = `${GOOGLE_SCRIPT_URL}?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
+            const endpoint = ENDPOINTS[currentEndpointIndex];
+            const url = `${endpoint}?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
             
             window[callbackName] = function(data) {
                 delete window[callbackName];
@@ -1020,6 +1115,7 @@
                 
                 setCachedData(cacheKey, data);
                 isFetchingFeasibility = false;
+                showGlobalPreloader(false);
                 processRequestInfo(data);
             };
             
@@ -1028,6 +1124,9 @@
             script.src = url;
             
             script.onerror = function() {
+                // تغییر به نقطه انتهایی بعدی در صورت خطا
+                currentEndpointIndex = (currentEndpointIndex + 1) % ENDPOINTS.length;
+                
                 lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
                 isFeasibilityAllowed = false;
@@ -1035,6 +1134,7 @@
                 delete window[callbackName];
                 document.getElementById('jsonp-script-' + callbackName)?.remove();
                 isFetchingFeasibility = false;
+                showGlobalPreloader(false);
                 toggleSections(false);
                 validateForm();
             };
@@ -1043,7 +1143,12 @@
         }
         
         // استفاده از debouncing برای درخواست‌ها
-        const debouncedFetchRequestInfo = debounce(fetchRequestInfo, 500);
+        const debouncedFetchRequestInfo = debounce(fetchRequestInfo, 300);
+        
+        // نمایش/پنهان‌سازی پیش‌بارگذار جهانی
+        function showGlobalPreloader(show) {
+            globalPreloader.style.display = show ? 'flex' : 'none';
+        }
         
         // تابع پردازش اطلاعات دریافتی
         function processRequestInfo(data) {
@@ -1074,6 +1179,11 @@
                     requestFeasibility.appendChild(feasibilityDiv);
                     
                     toggleSections(isFeasibilityAllowed);
+                    
+                    // فعال‌سازی همزمان دوربین و موقعیت‌یابی
+                    if (isFeasibilityAllowed) {
+                        initializeResources().catch(console.error);
+                    }
                 } else {
                     const timeDiv = document.createElement('div');
                     timeDiv.textContent = 'اطلاعاتی موجود نیست';
@@ -1090,6 +1200,9 @@
                     isFeasibilityAllowed = true;
                     feasibilityData[requestType] = { status: true };
                     toggleSections(true);
+                    
+                    // فعال‌سازی همزمان دوربین و موقعیت‌یابی
+                    initializeResources().catch(console.error);
                 }
             } else {
                 const errorDiv1 = document.createElement('div');
@@ -1280,6 +1393,7 @@
                 params.append('entry.1995166577', locationData.accuracy);
                 params.append('entry.1723693542', requestType);
                 
+                // ارسال بهینه‌شده با مدیریت خطا
                 await fetch(formUrl, {
                     method: 'POST',
                     headers: {
@@ -1345,6 +1459,20 @@
         // رویداد ورودی کد بازاریابی
         marketingCodeInput.addEventListener('input', function() {
             this.value = this.value.replace(/\D/g, '').slice(0, 5);
+            
+            // پیش‌بارگذاری داده‌ها هنگام ورود 3 رقم
+            if (this.value.length >= 3 && requestTypeSelect.value) {
+                showStatus("در حال بررسی مجوزها...", "processing");
+                document.querySelectorAll('.input-group, .camera-section, .location-section')
+                    .forEach(el => el.classList.add('loading-state'));
+                
+                if (this.value.length === 5) {
+                    debouncedFetchRequestInfo();
+                }
+            } else {
+                document.querySelectorAll('.input-group, .camera-section, .location-section')
+                    .forEach(el => el.classList.remove('loading-state'));
+            }
             
             if (requestInfoContainer.style.display === 'grid') {
                 isFetchingFeasibility = true;
