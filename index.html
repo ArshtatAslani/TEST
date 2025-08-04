@@ -809,17 +809,17 @@
         const workerScript = `
             self.onmessage = async function(e) {
                 const { marketingCode, requestType, url, timeout } = e.data;
-                
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), timeout);
-                    
                     const response = await fetch(\`\${url}?code=\${marketingCode}&type=\${encodeURIComponent(requestType)}\`, {
                         signal: controller.signal
                     });
-                    
                     clearTimeout(timeoutId);
                     const data = await response.json();
+                    if (!data || typeof data !== 'object') {
+                        throw new Error('Invalid response format');
+                    }
                     self.postMessage({ success: true, data });
                 } catch (error) {
                     clearTimeout(timeoutId);
@@ -997,7 +997,7 @@
                 return;
             }
             
-            isFeasibilityAllowed = feasibilityData[requestType]?.status || false;
+            isFeasibilityAllowed = feasibilityData[requestType]?.status === true;
             requestFeasibility.textContent = isFeasibilityAllowed ? 'مجاز' : 'غیرمجاز';
             requestFeasibility.classList.toggle('feasibility-allowed', isFeasibilityAllowed);
             requestFeasibility.classList.toggle('feasibility-denied', !isFeasibilityAllowed);
@@ -1009,19 +1009,28 @@
         function getCachedData(cacheKey) {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
-                const { timestamp, data } = JSON.parse(cached);
-                if (Date.now() - timestamp < 30000) { // کش برای 30 ثانیه معتبر است
-                    return data;
+                try {
+                    const { timestamp, data } = JSON.parse(cached);
+                    if (Date.now() - timestamp < 30000 && data && typeof data === 'object') { // کش برای 30 ثانیه معتبر است
+                        return data;
+                    }
+                } catch (e) {
+                    console.error('خطا در تجزیه کش:', e);
+                    localStorage.removeItem(cacheKey);
                 }
             }
             return null;
         }
         
         function setCachedData(cacheKey, data) {
-            localStorage.setItem(cacheKey, JSON.stringify({
-                timestamp: Date.now(),
-                data: data
-            }));
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    timestamp: Date.now(),
+                    data: data
+                }));
+            } catch (e) {
+                console.error('خطا در ذخیره کش:', e);
+            }
         }
         
         // تابع debouncing برای کاهش درخواست‌های مکرر
@@ -1048,6 +1057,8 @@
             }
             currentRequestController = new AbortController();
             
+            console.log(`ارسال درخواست برای کد: ${marketingCode}, نوع: ${requestType}`);
+            
             feasibilityWorker.postMessage({
                 marketingCode,
                 requestType,
@@ -1062,7 +1073,9 @@
             isFetchingFeasibility = false;
             currentRequestController = null;
             
-            if (success) {
+            console.log('پاسخ از Web Worker:', { success, data, error });
+            
+            if (success && data) {
                 const cacheKey = `${userId}_${marketingCodeInput.value}_${requestTypeSelect.value}`;
                 setCachedData(cacheKey, data);
                 processRequestInfo(data);
@@ -1073,7 +1086,8 @@
                 feasibilityData[requestTypeSelect.value] = { status: false };
                 toggleSections(false);
                 validateForm();
-                console.error('خطا در دریافت اطلاعات:', error);
+                showStatus(`خطا در دریافت اطلاعات: ${error || 'پاسخ نامعتبر'}`, 'error');
+                console.error('خطا در Web Worker:', error);
             }
             
             processRequestQueue();
@@ -1088,31 +1102,47 @@
                 lastRequestTime.innerHTML = '<span style="color:#6c757d">کد بازاریابی نامعتبر</span>';
                 requestFeasibility.innerHTML = '<span style="color:#6c757d">کد بازاریابی نامعتبر</span>';
                 toggleSections(false);
+                isFeasibilityAllowed = false;
+                validateForm();
                 return;
             }
             
             const cacheKey = `${userId}_${marketingCode}_${requestType}`;
             const cachedData = getCachedData(cacheKey);
             if (cachedData) {
+                console.log('استفاده از داده‌های کش‌شده:', cachedData);
                 processRequestInfo(cachedData);
                 return;
             }
             
-            requestQueue.push({ marketingCode, requestType });
+            requestQueue = [{ marketingCode, requestType }]; // فقط درخواست جدید نگه داشته شود
             processRequestQueue();
         }
         
-        // استفاده از debouncing برای درخواست‌ها
+        // استفاده از debouncing برای کاهش درخواست‌های مکرر
         const debouncedFetchRequestInfo = debounce(fetchRequestInfo, 500);
         
         // تابع پردازش اطلاعات دریافتی
         function processRequestInfo(data) {
+            console.log('پردازش اطلاعات دریافتی:', data);
+            
             const fragment = document.createDocumentFragment();
             const requestType = requestTypeSelect.value;
             
-            if (data.success) {
-                if (data.exists) {
+            if (data && data.success) {
+                if (data.exists && data.lastRecord && data.lastRecord.timestamp) {
                     const requestDate = new Date(data.lastRecord.timestamp);
+                    if (isNaN(requestDate.getTime())) {
+                        console.error('زمان نامعتبر:', data.lastRecord.timestamp);
+                        lastRequestTime.innerHTML = '<span style="color:#dc3545">زمان نامعتبر</span>';
+                        requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در داده‌ها</span>';
+                        isFeasibilityAllowed = false;
+                        feasibilityData[requestType] = { status: false };
+                        toggleSections(false);
+                        validateForm();
+                        return;
+                    }
+                    
                     const formattedTime = requestDate.toLocaleTimeString('fa-IR', {
                         hour12: false,
                         hour: '2-digit',
@@ -1124,8 +1154,8 @@
                     lastRequestTime.innerHTML = '';
                     lastRequestTime.appendChild(fragment);
                     
-                    feasibilityData[requestType] = { status: data.lastRecord.status };
-                    isFeasibilityAllowed = data.lastRecord.status;
+                    feasibilityData[requestType] = { status: data.lastRecord.status === true };
+                    isFeasibilityAllowed = data.lastRecord.status === true;
                     
                     const feasibilityDiv = document.createElement('div');
                     feasibilityDiv.textContent = isFeasibilityAllowed ? 'مجاز' : 'غیرمجاز';
@@ -1166,7 +1196,8 @@
                 isFeasibilityAllowed = false;
                 feasibilityData[requestType] = { status: false };
                 toggleSections(false);
-                console.error('خطا در دریافت اطلاعات:', data.error);
+                showStatus('خطا در دریافت اطلاعات از سرور', 'error');
+                console.error('خطا در داده‌های دریافتی:', data?.error || 'داده نامعتبر');
             }
             
             validateForm();
