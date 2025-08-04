@@ -504,29 +504,11 @@
             background: #ffebee;
         }
         
-        /* استایل لودینگ بهبودیافته */
+        /* استایل لودینگ */
         .loading-indicator {
             font-size: 14px;
             color: #1a2980;
             text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        
-        .loading-indicator::before {
-            content: '';
-            width: 20px;
-            height: 20px;
-            border: 3px solid #1a2980;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
         
         /* استایل وضعیت سیستم */
@@ -780,17 +762,15 @@
         let stream = null;
         let locationData = null;
         let currentCameraMode = "environment";
+        let requestInfoCallbackCounter = 0;
         let isFeasibilityAllowed = false;
         let feasibilityData = {};
         let clockInterval;
         let selectedRequestType = null;
         let isFetchingFeasibility = false;
-        let requestQueue = [];
-        let currentRequestController = null;
-        const userId = Math.random().toString(36).substr(2, 9); // شناسه یکتا برای کاربر
         
         // URL گوگل اسکریپت برای بررسی امکان‌سنجی
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwxOcs_CqQg9IAhEUTdkLV4DuGf9xntVd67bbWBmaGNG9ab-oAhv9J7SH3fIzcdM21K/exec";
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzc74Jvlo4eQ0zc3O43lw1J2-gseWezICETl8ApAPl7EdT7s6vmuZtE8fxn_MY1fDrL/exec";
         
         // بازه‌های زمانی مجاز برای ثبت حضور
         const allowedTimeSlots = [
@@ -804,39 +784,6 @@
             { start: { hour: 20, minute: 0 }, end: { hour: 20, minute: 30 } },
             { start: { hour: 22, minute: 0 }, end: { hour: 22, minute: 30 } }
         ];
-        
-        // ایجاد Web Worker
-        const workerScript = `
-            self.onmessage = async function(e) {
-                const { marketingCode, requestType, url, timeout } = e.data;
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), timeout);
-                    const response = await fetch(\`\${url}?code=\${marketingCode}&type=\${encodeURIComponent(requestType)}\`, {
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
-                    const text = await response.text();
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (parseError) {
-                        throw new Error('Invalid JSON format: ' + text);
-                    }
-                    if (!data || typeof data !== 'object') {
-                        throw new Error('Invalid response format');
-                    }
-                    self.postMessage({ success: true, data });
-                } catch (error) {
-                    clearTimeout(timeoutId);
-                    self.postMessage({ success: false, error: error.message });
-                }
-            };
-        `;
-        
-        const blob = new Blob([workerScript], { type: 'application/javascript' });
-        const workerURL = URL.createObjectURL(blob);
-        const feasibilityWorker = new Worker(workerURL);
         
         // تابع به‌روزرسانی ساعت زنده
         function updateClock() {
@@ -1003,7 +950,7 @@
                 return;
             }
             
-            isFeasibilityAllowed = feasibilityData[requestType]?.status === true;
+            isFeasibilityAllowed = feasibilityData[requestType]?.status || false;
             requestFeasibility.textContent = isFeasibilityAllowed ? 'مجاز' : 'غیرمجاز';
             requestFeasibility.classList.toggle('feasibility-allowed', isFeasibilityAllowed);
             requestFeasibility.classList.toggle('feasibility-denied', !isFeasibilityAllowed);
@@ -1015,28 +962,19 @@
         function getCachedData(cacheKey) {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
-                try {
-                    const { timestamp, data } = JSON.parse(cached);
-                    if (Date.now() - timestamp < 30000 && data && typeof data === 'object') { // کش برای 30 ثانیه معتبر است
-                        return data;
-                    }
-                } catch (e) {
-                    console.error('خطا در تجزیه کش:', e);
-                    localStorage.removeItem(cacheKey);
+                const { timestamp, data } = JSON.parse(cached);
+                if (Date.now() - timestamp < 60000) { // کش برای 60 ثانیه معتبر است
+                    return data;
                 }
             }
             return null;
         }
         
         function setCachedData(cacheKey, data) {
-            try {
-                localStorage.setItem(cacheKey, JSON.stringify({
-                    timestamp: Date.now(),
-                    data: data
-                }));
-            } catch (e) {
-                console.error('خطا در ذخیره کش:', e);
-            }
+            localStorage.setItem(cacheKey, JSON.stringify({
+                timestamp: Date.now(),
+                data: data
+            }));
         }
         
         // تابع debouncing برای کاهش درخواست‌های مکرر
@@ -1048,59 +986,8 @@
             };
         }
         
-        // تابع مدیریت صف درخواست‌ها
-        function processRequestQueue() {
-            if (requestQueue.length === 0 || isFetchingFeasibility) return;
-            
-            isFetchingFeasibility = true;
-            const { marketingCode, requestType } = requestQueue.shift();
-            
-            lastRequestTime.innerHTML = '<div class="loading-indicator">در حال بارگذاری...</div>';
-            requestFeasibility.innerHTML = '<div class="loading-indicator">در حال بررسی...</div>';
-            
-            if (currentRequestController) {
-                currentRequestController.abort();
-            }
-            currentRequestController = new AbortController();
-            
-            console.log(`ارسال درخواست برای کد: ${marketingCode}, نوع: ${requestType}`);
-            
-            feasibilityWorker.postMessage({
-                marketingCode,
-                requestType,
-                url: GOOGLE_SCRIPT_URL,
-                timeout: 15000 // 15 ثانیه تایم‌اوت
-            });
-        }
-        
-        // دریافت پیام از Web Worker
-        feasibilityWorker.onmessage = function(e) {
-            const { success, data, error } = e.data;
-            isFetchingFeasibility = false;
-            currentRequestController = null;
-            
-            console.log('پاسخ از Web Worker:', { success, data, error });
-            
-            if (success && data && typeof data === 'object') {
-                const cacheKey = `${userId}_${marketingCodeInput.value}_${requestTypeSelect.value}`;
-                setCachedData(cacheKey, data);
-                processRequestInfo(data);
-            } else {
-                lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
-                requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
-                isFeasibilityAllowed = false;
-                feasibilityData[requestTypeSelect.value] = { status: false };
-                toggleSections(false);
-                validateForm();
-                showStatus(`خطا در دریافت اطلاعات: ${error || 'پاسخ نامعتبر'}`, 'error');
-                console.error('خطا در Web Worker:', error);
-            }
-            
-            processRequestQueue();
-        };
-        
-        // تابع دریافت اطلاعات امکان‌سنجی
-        function fetchRequestInfo() {
+        // تابع دریافت اطلاعات امکان‌سنجی با کش
+        async function fetchRequestInfo() {
             const marketingCode = marketingCodeInput.value.trim();
             const requestType = requestTypeSelect.value;
             
@@ -1108,47 +995,64 @@
                 lastRequestTime.innerHTML = '<span style="color:#6c757d">کد بازاریابی نامعتبر</span>';
                 requestFeasibility.innerHTML = '<span style="color:#6c757d">کد بازاریابی نامعتبر</span>';
                 toggleSections(false);
-                isFeasibilityAllowed = false;
-                validateForm();
                 return;
             }
             
-            const cacheKey = `${userId}_${marketingCode}_${requestType}`;
+            const cacheKey = `${marketingCode}_${requestType}`;
             const cachedData = getCachedData(cacheKey);
             if (cachedData) {
-                console.log('استفاده از داده‌های کش‌شده:', cachedData);
                 processRequestInfo(cachedData);
                 return;
             }
             
-            requestQueue = [{ marketingCode, requestType }]; // فقط درخواست جدید نگه داشته شود
-            processRequestQueue();
+            isFetchingFeasibility = true;
+            toggleSections(false);
+            
+            lastRequestTime.innerHTML = '<div class="loading-indicator">در حال بارگذاری...</div>';
+            requestFeasibility.innerHTML = '<div class="loading-indicator">در حال بررسی...</div>';
+            
+            const callbackName = 'jsonpCallback_' + (requestInfoCallbackCounter++);
+            const url = `${GOOGLE_SCRIPT_URL}?code=${marketingCode}&type=${encodeURIComponent(requestType)}&callback=${callbackName}`;
+            
+            window[callbackName] = function(data) {
+                delete window[callbackName];
+                document.getElementById('jsonp-script-' + callbackName)?.remove();
+                
+                setCachedData(cacheKey, data);
+                isFetchingFeasibility = false;
+                processRequestInfo(data);
+            };
+            
+            const script = document.createElement('script');
+            script.id = 'jsonp-script-' + callbackName;
+            script.src = url;
+            
+            script.onerror = function() {
+                lastRequestTime.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
+                requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در اتصال به سرور</span>';
+                isFeasibilityAllowed = false;
+                feasibilityData[requestType] = { status: false };
+                delete window[callbackName];
+                document.getElementById('jsonp-script-' + callbackName)?.remove();
+                isFetchingFeasibility = false;
+                toggleSections(false);
+                validateForm();
+            };
+            
+            document.body.appendChild(script);
         }
         
-        // استفاده از debouncing برای کاهش درخواست‌های مکرر
+        // استفاده از debouncing برای درخواست‌ها
         const debouncedFetchRequestInfo = debounce(fetchRequestInfo, 500);
         
         // تابع پردازش اطلاعات دریافتی
         function processRequestInfo(data) {
-            console.log('پردازش اطلاعات دریافتی:', data);
-            
             const fragment = document.createDocumentFragment();
             const requestType = requestTypeSelect.value;
             
-            if (data && data.success) {
-                if (data.exists && data.lastRecord && data.lastRecord.timestamp) {
+            if (data.success) {
+                if (data.exists) {
                     const requestDate = new Date(data.lastRecord.timestamp);
-                    if (isNaN(requestDate.getTime())) {
-                        console.error('زمان نامعتبر:', data.lastRecord.timestamp);
-                        lastRequestTime.innerHTML = '<span style="color:#dc3545">زمان نامعتبر</span>';
-                        requestFeasibility.innerHTML = '<span style="color:#dc3545">خطا در داده‌ها</span>';
-                        isFeasibilityAllowed = false;
-                        feasibilityData[requestType] = { status: false };
-                        toggleSections(false);
-                        validateForm();
-                        return;
-                    }
-                    
                     const formattedTime = requestDate.toLocaleTimeString('fa-IR', {
                         hour12: false,
                         hour: '2-digit',
@@ -1160,8 +1064,8 @@
                     lastRequestTime.innerHTML = '';
                     lastRequestTime.appendChild(fragment);
                     
-                    feasibilityData[requestType] = { status: data.lastRecord.status === true };
-                    isFeasibilityAllowed = data.lastRecord.status === true;
+                    feasibilityData[requestType] = { status: data.lastRecord.status };
+                    isFeasibilityAllowed = data.lastRecord.status;
                     
                     const feasibilityDiv = document.createElement('div');
                     feasibilityDiv.textContent = isFeasibilityAllowed ? 'مجاز' : 'غیرمجاز';
@@ -1202,8 +1106,7 @@
                 isFeasibilityAllowed = false;
                 feasibilityData[requestType] = { status: false };
                 toggleSections(false);
-                showStatus('خطا در دریافت اطلاعات از سرور', 'error');
-                console.error('خطا در داده‌های دریافتی:', data?.error || 'داده نامعتبر');
+                console.error('خطا در دریافت اطلاعات:', data.error);
             }
             
             validateForm();
@@ -1417,7 +1320,6 @@
                     selectedRequestType = null;
                     localStorage.clear();
                     isFetchingFeasibility = false;
-                    requestQueue = [];
                     
                     toggleSections(false);
                 }, 2000);
@@ -1504,12 +1406,6 @@
             clockInterval = setInterval(updateClock, 1000);
             toggleSystemState();
             setInterval(toggleSystemState, 60000);
-        });
-        
-        // تمیز کردن Web Worker در هنگام بسته شدن صفحه
-        window.addEventListener('unload', () => {
-            feasibilityWorker.terminate();
-            URL.revokeObjectURL(workerURL);
         });
     </script>
 </body>
